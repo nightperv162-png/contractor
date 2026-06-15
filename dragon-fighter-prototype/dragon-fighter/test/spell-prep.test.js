@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CONFIG } from '../src/config.js';
 import { createInitialGameState } from '../src/core/gameState.js';
+import { createInputController } from '../src/input/inputController.js';
 import { analyzePattern, generateRandomPattern, getPiercePercent, getWeightBand } from '../src/spells/patternAnalyzer.js';
 import { createSpell } from '../src/spells/spellFactory.js';
 import { getNameSimilarity, validateLoadout, validateSpellName } from '../src/spells/spellLoadout.js';
@@ -77,4 +78,35 @@ test('preparation flow draws, randomizes, saves five spells, and confirms loadou
   assert.equal(validateLoadout(state.sides[CONFIG.match.playerId].spellLoadout, CONFIG).ok, true);
   assert.equal(confirmLoadout(state, null, CONFIG).ok, true);
   assert.equal(state.phase, CONFIG.states.matchPreview);
+});
+
+test('spell name editing is separate from basic action shortcuts', () => {
+  const state = createInitialGameState(CONFIG);
+  const handlers = {};
+  const fakeCanvas = {
+    addEventListener() {},
+    removeEventListener() {}
+  };
+  const fakeWindow = {
+    addEventListener(type, handler) {
+      handlers[type] = handler;
+    },
+    removeEventListener() {}
+  };
+
+  const input = createInputController({ canvas: fakeCanvas, state, logger: null, config: CONFIG, windowRef: fakeWindow });
+  input.attach();
+  state.preparation.nameFieldFocused = true;
+  state.preparation.draftSpellName = '';
+  let prevented = false;
+  handlers.keydown({
+    key: CONFIG.actions.attack.key,
+    preventDefault() {
+      prevented = true;
+    }
+  });
+
+  assert.equal(prevented, true);
+  assert.equal(state.preparation.draftSpellName, CONFIG.actions.attack.key);
+  assert.equal(state.sides[CONFIG.match.playerId].latestReason, '');
 });

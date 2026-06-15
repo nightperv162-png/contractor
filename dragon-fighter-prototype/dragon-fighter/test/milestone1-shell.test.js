@@ -45,9 +45,9 @@ test('layout helpers expose Canvas button regions for preparation and match prev
 
   const actionButtons = getActionButtonRects(CONFIG);
   assert.equal(actionButtons.length, Object.keys(CONFIG.actions).length);
-  assert.equal(actionButtons[CONFIG.match.minHp].kind, 'action');
+  assert.equal(actionButtons[CONFIG.match.minHp].kind, 'basic-action');
 
   const spellButtons = getSpellButtonRects(CONFIG);
   assert.equal(spellButtons.length, CONFIG.spells.perLoadout);
-  assert.equal(spellButtons[CONFIG.match.minHp].kind, 'spell');
+  assert.equal(spellButtons[CONFIG.match.minHp].kind, 'prepared-spell');
 });

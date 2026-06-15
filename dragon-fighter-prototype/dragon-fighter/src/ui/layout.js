@@ -109,7 +109,7 @@ export function getActionButtonRects(config = CONFIG) {
 
   return ACTION_IDS.map((actionId, index) => ({
     id: `action-${actionId}`,
-    kind: 'action',
+    kind: 'basic-action',
     label: config.actions[actionId].command,
     actionId,
     rect: {
@@ -127,7 +127,7 @@ export function getSpellButtonRects(config = CONFIG) {
 
   return config.spells.defaultPlayerNames.map((name, index) => ({
     id: `spell-${name.toLowerCase().replace(/\s+/g, '-')}`,
-    kind: 'spell',
+    kind: 'prepared-spell',
     label: name,
     spellIndex: index,
     rect: {

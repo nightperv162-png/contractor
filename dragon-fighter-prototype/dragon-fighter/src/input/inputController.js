@@ -40,7 +40,7 @@ export function createInputController({ canvas, state, logger, random = Math.ran
   const SpeechRecognition = getSpeechRecognitionConstructor(windowRef);
   let recognizer = null;
 
-  function submitAction(actionId, source) {
+  function submitBasicAction(actionId, source) {
     const command = commandTextForAction(actionId, config);
     return attemptCommand(state, config.match.playerId, command, source, logger, config);
   }
@@ -134,8 +134,8 @@ export function createInputController({ canvas, state, logger, random = Math.ran
       return;
     }
 
-    if (button.kind === 'action') {
-      submitAction(button.actionId, 'canvas-button');
+    if (button.kind === 'basic-action') {
+      submitBasicAction(button.actionId, 'canvas-button');
       return;
     }
 
@@ -160,11 +160,16 @@ export function createInputController({ canvas, state, logger, random = Math.ran
   }
 
   function handleKeyboard(event) {
+    if (state.phase === config.states.preparation && editDraftName(state, event.key, logger, config)) {
+      event.preventDefault();
+      return;
+    }
+
     const key = String(event.key).toLowerCase();
     const actionId = getActionByKey(key, config);
     if (actionId) {
       event.preventDefault();
-      submitAction(actionId, 'keyboard');
+      submitBasicAction(actionId, 'keyboard');
       return;
     }
 
@@ -178,10 +183,6 @@ export function createInputController({ canvas, state, logger, random = Math.ran
       event.preventDefault();
       startVoiceRecognition();
       return;
-    }
-
-    if (state.phase === config.states.preparation && editDraftName(state, event.key, logger, config)) {
-      event.preventDefault();
     }
   }
 
@@ -199,7 +200,7 @@ export function createInputController({ canvas, state, logger, random = Math.ran
       windowRef.removeEventListener('keydown', handleKeyboard);
       logger?.info('Input handlers detached');
     },
-    submitAction,
+    submitBasicAction,
     startVoiceRecognition,
     restartMatch
   };
