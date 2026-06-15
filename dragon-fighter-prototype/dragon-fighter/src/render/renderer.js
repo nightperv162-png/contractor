@@ -1,6 +1,7 @@
 import { ACTION_IDS, CONFIG } from '../config.js';
 import { formatCommandReference } from '../combat/actions.js';
 import { getVisibleStateLabel } from '../core/gameState.js';
+import { getActionButtonRects, getPreparationRects, getSpellButtonRects } from '../ui/layout.js';
 
 function font(size, weight, config) {
   return `${weight} ${size}px ${config.fonts.family}`;
@@ -129,6 +130,7 @@ function drawStatusPanel(ctx, side, x, y, alignRight, config) {
   ctx.fillStyle = config.colors.textSecondary;
   ctx.textAlign = alignRight ? 'right' : 'left';
   ctx.fillText(`${side.hp}/${config.match.startingHp} HP`, textX, y + config.layout.hpBarY + config.layout.hpBarHeight + config.layout.cooldownChipGap);
+  ctx.fillText(`${config.text.energyLabel}: ${side.energy}/${side.maxEnergy}`, textX, y + config.layout.hpBarY + config.layout.hpBarHeight + config.layout.cooldownChipGap + config.fonts.smallSize);
   drawCooldowns(ctx, hpX, y + config.layout.statusPanelHeight - config.layout.outerPadding - config.layout.cooldownChipHeight, side, config);
 }
 
@@ -140,7 +142,7 @@ function drawTimer(ctx, state, config) {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = config.colors.textPrimary;
   ctx.font = font(config.fonts.largeSize, config.fonts.boldWeight, config);
-  const timerValue = state.phase === config.match.countdownPhase ? config.match.durationSeconds : Math.ceil(state.matchRemaining);
+  const timerValue = state.phase === config.match.countdownPhase || state.phase === config.states.matchPreview ? config.match.durationSeconds : Math.ceil(state.matchRemaining);
   ctx.fillText(`${timerValue}s`, x + config.layout.timerPanelWidth / config.match.sideCount, y + config.layout.timerPanelHeight / config.match.sideCount);
 }
 
@@ -310,19 +312,13 @@ function drawCommandHud(ctx, state, config) {
 }
 
 function drawActionButtons(ctx, state, config) {
-  const totalWidth = ACTION_IDS.length * config.layout.actionButtonWidth + (ACTION_IDS.length - (config.match.sideCount - 1)) * config.layout.actionButtonGap;
-  const startX = centeredX(totalWidth, config);
-  ACTION_IDS.forEach((actionId, index) => {
-    const x = startX + index * (config.layout.actionButtonWidth + config.layout.actionButtonGap);
-    drawButton(ctx, state, `action-${actionId}`, 'action', config.actions[actionId].command, {
-      x,
-      y: config.layout.actionButtonY,
-      width: config.layout.actionButtonWidth,
-      height: config.layout.actionButtonHeight
-    }, actionId, config);
+  const actionButtons = getActionButtonRects(config);
+  actionButtons.forEach((button) => {
+    drawButton(ctx, state, button.id, button.kind, button.label, button.rect, button.actionId, config);
   });
 
-  const voiceX = startX + totalWidth + config.layout.actionButtonGap;
+  const lastButton = actionButtons[actionButtons.length - (config.match.sideCount - 1)];
+  const voiceX = lastButton.rect.x + lastButton.rect.width + config.layout.actionButtonGap;
   drawButton(ctx, state, 'voice', 'voice', config.input.voiceButtonLabel, {
     x: voiceX,
     y: config.layout.actionButtonY,
@@ -335,6 +331,119 @@ function drawActionButtons(ctx, state, config) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(state.voiceStatus, config.canvas.width / config.match.sideCount, config.layout.actionButtonY - config.layout.cooldownChipHeight);
+}
+
+function drawSpellButtons(ctx, state, config) {
+  getSpellButtonRects(config).forEach((button) => {
+    const spell = state.sides[config.match.playerId].spellLoadout[button.spellIndex];
+    registerButton(state, button.id, button.kind, spell.name, button.rect, null);
+    drawRoundedRect(ctx, button.rect.x, button.rect.y, button.rect.width, button.rect.height, config.layout.cornerRadius, config.colors.buttonFill, config.colors.panelStroke, config.layout.panelLineWidth, config);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = config.colors.textPrimary;
+    ctx.font = font(config.fonts.smallSize, config.fonts.boldWeight, config);
+    ctx.fillText(spell.name, button.rect.x + button.rect.width / config.match.sideCount, button.rect.y + button.rect.height / config.match.sideCount - config.layout.cooldownChipGap);
+    ctx.fillStyle = config.colors.textSecondary;
+    ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
+    ctx.fillText(spell.type, button.rect.x + button.rect.width / config.match.sideCount, button.rect.y + button.rect.height / config.match.sideCount + config.layout.cooldownChipGap);
+  });
+}
+
+function drawSectionTitle(ctx, title, x, y, config) {
+  ctx.font = font(config.fonts.normalSize, config.fonts.boldWeight, config);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = config.colors.textPrimary;
+  ctx.fillText(title, x, y);
+}
+
+function drawPreparationHeader(ctx, config) {
+  ctx.fillStyle = config.colors.background;
+  ctx.fillRect(config.match.minHp, config.match.minHp, config.canvas.width, config.canvas.height);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.font = font(config.fonts.largeSize, config.fonts.boldWeight, config);
+  ctx.fillStyle = config.colors.textPrimary;
+  ctx.fillText(config.text.preparationTitle, config.canvas.width / config.match.sideCount, config.layout.outerPadding);
+  ctx.font = font(config.fonts.normalSize, config.fonts.normalWeight, config);
+  ctx.fillStyle = config.colors.textSecondary;
+  ctx.fillText(config.text.preparationSubtitle, config.canvas.width / config.match.sideCount, config.layout.outerPadding + config.fonts.largeSize);
+}
+
+function drawEggGrid(ctx, rect, config) {
+  const gridWidth = config.layout.eggGridGap * (config.layout.eggGridColumns - (config.match.sideCount - 1));
+  const gridHeight = config.layout.eggGridGap * (config.layout.eggGridRows - (config.match.sideCount - 1));
+  const startX = rect.x + (rect.width - gridWidth) / config.match.sideCount;
+  const startY = rect.y + config.layout.outerPadding * config.match.sideCount;
+
+  ctx.strokeStyle = config.colors.arenaLine;
+  ctx.lineWidth = config.layout.panelLineWidth;
+  for (let row = config.match.minHp; row < config.layout.eggGridRows; row += config.match.energyRegenPerSecond) {
+    for (let column = config.match.minHp; column < config.layout.eggGridColumns; column += config.match.energyRegenPerSecond) {
+      const x = startX + column * config.layout.eggGridGap;
+      const y = startY + row * config.layout.eggGridGap;
+      ctx.beginPath();
+      ctx.arc(x, y, config.layout.eggGridPointRadius, config.match.minHp, Math.PI * config.match.sideCount);
+      ctx.fillStyle = config.colors.cooldownReady;
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+}
+
+function drawPreparationPanelText(ctx, rect, state, config) {
+  drawSectionTitle(ctx, config.text.spellTypeTitle, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding, config);
+  ctx.font = font(config.fonts.normalSize, config.fonts.boldWeight, config);
+  ctx.fillStyle = config.colors.cooldownReady;
+  ctx.fillText(state.preparation.selectedSpellType, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.fonts.normalSize + config.layout.cooldownChipGap);
+
+  drawSectionTitle(ctx, config.text.spellNameTitle, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.layout.statusPanelHeight, config);
+  ctx.font = font(config.fonts.normalSize, config.fonts.boldWeight, config);
+  ctx.fillStyle = config.colors.textPrimary;
+  ctx.fillText(state.preparation.draftSpellName, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.layout.statusPanelHeight + config.fonts.normalSize + config.layout.cooldownChipGap);
+
+  drawSectionTitle(ctx, config.text.patternSummaryTitle, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.layout.statusPanelHeight * config.match.sideCount, config);
+  ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
+  ctx.fillStyle = config.colors.textSecondary;
+  ctx.fillText(state.preparation.patternSummary, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.layout.statusPanelHeight * config.match.sideCount + config.fonts.normalSize + config.layout.cooldownChipGap);
+
+  drawSectionTitle(ctx, config.text.effectPreviewTitle, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.layout.statusPanelHeight * config.layout.panelLineWidth, config);
+  ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
+  ctx.fillStyle = config.colors.textSecondary;
+  ctx.fillText(state.preparation.effectPreview, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.layout.statusPanelHeight * config.layout.panelLineWidth + config.fonts.normalSize + config.layout.cooldownChipGap);
+}
+
+function drawSpellSlots(ctx, rect, state, config) {
+  drawSectionTitle(ctx, config.text.spellSlotsTitle, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding, config);
+  state.sides[config.match.playerId].spellLoadout.forEach((spell, index) => {
+    const slotY = rect.y + config.layout.outerPadding + config.fonts.normalSize + config.layout.cooldownChipGap + index * (config.layout.spellSlotHeight + config.layout.spellSlotGap);
+    drawRoundedRect(ctx, rect.x + config.layout.outerPadding, slotY, rect.width - config.layout.outerPadding * config.match.sideCount, config.layout.spellSlotHeight, config.layout.cornerRadius, config.colors.buttonFill, config.colors.panelStroke, config.layout.panelLineWidth / config.match.sideCount, config);
+    ctx.font = font(config.fonts.smallSize, config.fonts.boldWeight, config);
+    ctx.fillStyle = config.colors.textPrimary;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(spell.name, rect.x + config.layout.outerPadding * config.match.sideCount, slotY + config.layout.cooldownChipGap);
+    ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
+    ctx.fillStyle = config.colors.textSecondary;
+    ctx.fillText(`${spell.type} - ${spell.status}`, rect.x + config.layout.outerPadding * config.match.sideCount, slotY + config.layout.cooldownChipGap + config.fonts.smallSize);
+  });
+}
+
+function drawPreparationScreen(ctx, state, config) {
+  const rects = getPreparationRects(config);
+  drawPreparationHeader(ctx, config);
+
+  panel(ctx, rects.eggDrawing.x, rects.eggDrawing.y, rects.eggDrawing.width, rects.eggDrawing.height, config);
+  drawSectionTitle(ctx, config.text.eggDrawingTitle, rects.eggDrawing.x + config.layout.outerPadding, rects.eggDrawing.y + config.layout.outerPadding, config);
+  drawEggGrid(ctx, rects.eggDrawing, config);
+
+  panel(ctx, rects.forgePanel.x, rects.forgePanel.y, rects.forgePanel.width, rects.forgePanel.height, config);
+  drawPreparationPanelText(ctx, rects.forgePanel, state, config);
+  drawButton(ctx, state, 'random-pattern', 'static', config.text.randomPatternLabel, rects.randomPatternButton, null, config);
+
+  panel(ctx, rects.spellSlots.x, rects.spellSlots.y, rects.spellSlots.width, rects.spellSlots.height, config);
+  drawSpellSlots(ctx, rects.spellSlots, state, config);
+  drawButton(ctx, state, 'preview-match', 'preview-match', config.text.confirmLoadoutLabel, rects.confirmLoadoutButton, null, config);
 }
 
 function drawOverlays(ctx, state, config) {
@@ -385,10 +494,24 @@ function drawAssetWarning(ctx, config) {
   ctx.fillText(config.text.assetWarning, config.layout.outerPadding, config.layout.floorBottomY);
 }
 
-export function renderGame(canvas, ctx, state, config = CONFIG) {
-  state.uiButtons = [];
-  ctx.save();
+function drawMatchPreviewHeader(ctx, state, config) {
+  if (state.phase !== config.states.matchPreview) return;
 
+  ctx.font = font(config.fonts.normalSize, config.fonts.boldWeight, config);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = config.colors.textSecondary;
+  ctx.fillText(config.text.matchPreviewTitle, config.canvas.width / config.match.sideCount, config.layout.outerPadding + config.layout.timerPanelHeight + config.layout.cooldownChipGap);
+
+  drawButton(ctx, state, 'back-to-forge', 'back-to-forge', config.text.backToForgeLabel, {
+    x: config.layout.outerPadding,
+    y: config.layout.outerPadding + config.layout.statusPanelHeight + config.layout.cooldownChipGap,
+    width: config.layout.prepButtonWidth,
+    height: config.layout.prepButtonHeight
+  }, null, config);
+}
+
+function renderMatchScreen(ctx, state, config) {
   if (state.shakeRemaining > config.match.minHp) {
     const shakeRatio = state.shakeRemaining / config.animation.shakeSeconds;
     const offset = Math.sin(state.elapsedSeconds * config.match.durationSeconds) * config.animation.shakePixels * shakeRatio;
@@ -402,9 +525,22 @@ export function renderGame(canvas, ctx, state, config = CONFIG) {
   drawStatusPanel(ctx, state.sides[config.match.playerId], config.layout.outerPadding, config.layout.outerPadding, false, config);
   drawStatusPanel(ctx, state.sides[config.match.aiId], config.canvas.width - config.layout.outerPadding - config.layout.statusPanelWidth, config.layout.outerPadding, true, config);
   drawTimer(ctx, state, config);
+  drawMatchPreviewHeader(ctx, state, config);
+  drawSpellButtons(ctx, state, config);
   drawCommandHud(ctx, state, config);
   drawActionButtons(ctx, state, config);
   drawAssetWarning(ctx, config);
+}
+
+export function renderGame(canvas, ctx, state, config = CONFIG) {
+  state.uiButtons = [];
+  ctx.save();
+
+  if (state.phase === config.states.preparation) {
+    drawPreparationScreen(ctx, state, config);
+  } else {
+    renderMatchScreen(ctx, state, config);
+  }
   ctx.restore();
 
   drawOverlays(ctx, state, config);

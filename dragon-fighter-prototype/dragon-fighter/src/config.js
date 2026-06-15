@@ -28,6 +28,19 @@ export const CONFIG = {
     verboseFrames: false
   },
 
+  states: {
+    // Preparation state name used before combat so the player can review the egg spell forge. Recommended: preparation.
+    preparation: 'preparation',
+    // Match preview state name used for the static battle HUD layout. Recommended: match-preview.
+    matchPreview: 'match-preview',
+    // Countdown state name used once a real match wrapper is active. Recommended: countdown.
+    countdown: 'countdown',
+    // Active match state name used when combat rules are live. Recommended: active.
+    active: 'active',
+    // Result state name used after win, lose, or draw. Recommended: result.
+    result: 'result'
+  },
+
   canvas: {
     // Internal design width for all Canvas drawing. Recommended range: 960–1920.
     width: 1280,
@@ -122,6 +135,14 @@ export const CONFIG = {
     fightBannerSeconds: 0.8,
     // Starting HP for each side. Recommended range: 50–200.
     startingHp: 100,
+    // Starting energy cubes for each side. Recommended range: 10-30.
+    startingEnergy: 20,
+    // Lowest allowed energy value. Recommended: 0.
+    minEnergy: 0,
+    // Highest allowed energy cubes for each side. Recommended range: 20-50.
+    maxEnergy: 30,
+    // Energy regenerated each second during active combat. Recommended range: 0.5-3.
+    energyRegenPerSecond: 1,
     // Lowest allowed HP value. Recommended: 0.
     minHp: 0,
     // Number of players in the prototype. Recommended: 2 for this vertical slice.
@@ -255,6 +276,25 @@ export const CONFIG = {
     waitingLabel: 'Waiting'
   },
 
+  spells: {
+    // Number of prepared egg spells each side brings into combat. Recommended: exactly 5 for this prototype.
+    perLoadout: 5,
+    // Spell family names used for Vietnamese-myth placeholder identity. Recommended: five short unique words.
+    defaultFamilies: ['Long', 'Son', 'Thuy', 'Giong', 'Truc'],
+    // Default player spell names shown in the static Milestone 1 shell. Recommended: unique two-word names.
+    defaultPlayerNames: ['Long Fire', 'Son Guard', 'Thuy Heal', 'Giong Snare', 'Truc Dash'],
+    // Default AI spell names shown in the static Milestone 1 shell. Recommended: unique two-word names.
+    defaultAiNames: ['Long Spark', 'Son Wall', 'Thuy Mend', 'Giong Net', 'Truc Step'],
+    // Spell type labels used in the forge selector and spell buttons. Recommended: the five GDD types.
+    types: ['Attack', 'Defense', 'Support', 'Control', 'Utility'],
+    // Placeholder text for empty or not-yet-editable spell slots. Recommended: short status text.
+    placeholderStatus: 'Ready to forge',
+    // Static summary text for the Milestone 1 pattern panel before real analysis exists. Recommended: short text.
+    patternSummaryPlaceholder: 'Pattern summary placeholder',
+    // Static effect preview text before spell rules are implemented. Recommended: short text.
+    effectPreviewPlaceholder: 'Effect preview placeholder'
+  },
+
   input: {
     // Enables browser speech recognition when supported. Recommended: true for voice prototype testing.
     voiceEnabled: true,
@@ -311,6 +351,46 @@ export const CONFIG = {
     latestPanelWidth: 360,
     // Height for latest command panels in pixels. Recommended range: 58–96.
     latestPanelHeight: 82,
+    // Preparation screen main drawing area x position in design pixels. Recommended range: 40-180.
+    eggDrawingX: 70,
+    // Preparation screen main drawing area y position in design pixels. Recommended range: 120-220.
+    eggDrawingY: 150,
+    // Preparation screen main drawing area width in pixels. Recommended range: 320-520.
+    eggDrawingWidth: 430,
+    // Preparation screen main drawing area height in pixels. Recommended range: 320-500.
+    eggDrawingHeight: 410,
+    // 9-dot grid spacing inside the egg drawing panel in pixels. Recommended range: 70-120.
+    eggGridGap: 96,
+    // Number of rows in the 9-dot egg grid. Recommended: 3.
+    eggGridRows: 3,
+    // Number of columns in the 9-dot egg grid. Recommended: 3.
+    eggGridColumns: 3,
+    // 9-dot grid point radius in pixels. Recommended range: 6-18.
+    eggGridPointRadius: 10,
+    // Preparation control panel x position in design pixels. Recommended range: 520-760.
+    forgePanelX: 545,
+    // Preparation control panel y position in design pixels. Recommended range: 120-220.
+    forgePanelY: 150,
+    // Preparation control panel width in pixels. Recommended range: 300-460.
+    forgePanelWidth: 355,
+    // Preparation control panel height in pixels. Recommended range: 320-500.
+    forgePanelHeight: 410,
+    // Spell slot panel x position in design pixels. Recommended range: 900-1040.
+    spellSlotsX: 940,
+    // Spell slot panel y position in design pixels. Recommended range: 120-220.
+    spellSlotsY: 150,
+    // Spell slot panel width in pixels. Recommended range: 260-360.
+    spellSlotsWidth: 290,
+    // Spell slot panel height in pixels. Recommended range: 320-500.
+    spellSlotsHeight: 410,
+    // Single spell slot height in pixels. Recommended range: 42-72.
+    spellSlotHeight: 58,
+    // Gap between spell slot rows in pixels. Recommended range: 6-16.
+    spellSlotGap: 10,
+    // Width for preparation action buttons in pixels. Recommended range: 160-260.
+    prepButtonWidth: 210,
+    // Height for preparation action buttons in pixels. Recommended range: 42-64.
+    prepButtonHeight: 52,
     // Bottom margin for command HUD in pixels. Recommended range: 16–40.
     bottomMargin: 20,
     // Vertical placement for the arena horizon in pixels. Recommended range: 240–420.
@@ -357,6 +437,14 @@ export const CONFIG = {
     actionButtonY: 628,
     // Width of the Voice button in pixels. Recommended range: 90–160.
     voiceButtonWidth: 122,
+    // Width of each match spell button in pixels. Recommended range: 120-190.
+    spellButtonWidth: 150,
+    // Height of each match spell button in pixels. Recommended range: 42-68.
+    spellButtonHeight: 56,
+    // Gap between match spell buttons in pixels. Recommended range: 8-18.
+    spellButtonGap: 12,
+    // Y position of match spell buttons in design pixels. Recommended range: 540-620.
+    spellButtonY: 560,
     // Width of the Restart button in pixels. Recommended range: 130–220.
     restartButtonWidth: 174,
     // Height of overlay buttons in pixels. Recommended range: 42–72.
@@ -405,6 +493,34 @@ export const CONFIG = {
     aiElement: '🌊',
     // Command reference heading. Recommended: short text.
     commandReferenceTitle: 'Say full command words',
+    // Preparation screen heading. Recommended: short text.
+    preparationTitle: 'Egg Spell Forge',
+    // Preparation screen subtitle. Recommended: short text.
+    preparationSubtitle: 'Static forge layout preview',
+    // Egg drawing panel heading. Recommended: short text.
+    eggDrawingTitle: '9-Dot Egg Pattern',
+    // Spell type selector heading. Recommended: short text.
+    spellTypeTitle: 'Spell Type',
+    // Spell name field heading. Recommended: short text.
+    spellNameTitle: 'Spell Name',
+    // Pattern summary heading. Recommended: short text.
+    patternSummaryTitle: 'Pattern Summary',
+    // Effect preview heading. Recommended: short text.
+    effectPreviewTitle: 'Effect Preview',
+    // Spell slot panel heading. Recommended: short text.
+    spellSlotsTitle: 'Five Prepared Spells',
+    // Random pattern button label. Recommended: short command text.
+    randomPatternLabel: 'Random Pattern',
+    // Confirm loadout button label. Recommended: short command text.
+    confirmLoadoutLabel: 'Preview Match',
+    // Match preview back button label. Recommended: short command text.
+    backToForgeLabel: 'Back To Forge',
+    // Match screen static heading. Recommended: short text.
+    matchPreviewTitle: 'Match Layout Preview',
+    // Energy label text used in HUD panels. Recommended: short text.
+    energyLabel: 'Energy',
+    // Microphone status label used in match HUD. Recommended: short text.
+    microphoneStateLabel: 'Mic',
     // Latest player command heading. Recommended: short text.
     latestPlayerTitle: 'P1 Heard',
     // Latest AI command heading. Recommended: short text.

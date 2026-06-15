@@ -14,6 +14,7 @@ function activeState() {
 
 test('countdown transitions to active phase and displays fight banner', () => {
   const state = createInitialGameState(CONFIG);
+  state.phase = CONFIG.match.countdownPhase;
   updateMatchState(state, CONFIG.match.countdownSeconds, () => CONFIG.match.minHp, null, CONFIG);
   assert.equal(state.phase, CONFIG.match.activePhase);
   assert.equal(state.fightBannerRemaining, CONFIG.match.fightBannerSeconds);
@@ -59,7 +60,7 @@ test('restart reset restores countdown, HP, cooldowns, labels, and result state'
   state.sides[CONFIG.match.playerId].hp = CONFIG.match.minHp;
   state.sides[CONFIG.match.playerId].cooldowns.attack = CONFIG.actions.attack.cooldownSeconds;
   resetGameState(state, CONFIG);
-  assert.equal(state.phase, CONFIG.match.countdownPhase);
+  assert.equal(state.phase, CONFIG.states.preparation);
   assert.equal(state.result, null);
   assert.equal(state.sides[CONFIG.match.playerId].hp, CONFIG.match.startingHp);
   assert.equal(state.sides[CONFIG.match.playerId].cooldowns.attack, CONFIG.match.minHp);

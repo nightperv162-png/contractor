@@ -2,6 +2,7 @@ import { CONFIG } from '../config.js';
 import { commandTextForAction, getActionByKey, truncateTranscript } from '../combat/actions.js';
 import { attemptCommand } from '../combat/matchRules.js';
 import { resetGameState } from '../core/gameState.js';
+import { showMatchPreview, showPreparation } from '../core/stateMachine.js';
 
 function mapPointerToCanvas(event, canvas, config) {
   const rect = canvas.getBoundingClientRect();
@@ -100,6 +101,16 @@ export function createInputController({ canvas, state, logger, config = CONFIG, 
 
     if (button.kind === 'restart') {
       restartMatch('canvas-button');
+      return;
+    }
+
+    if (button.kind === 'preview-match') {
+      showMatchPreview(state, logger, config);
+      return;
+    }
+
+    if (button.kind === 'back-to-forge') {
+      showPreparation(state, logger, config);
     }
   }
 

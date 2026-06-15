@@ -4,12 +4,26 @@ function createCooldownMap() {
   return Object.fromEntries(ACTION_IDS.map((actionId) => [actionId, CONFIG.match.minHp]));
 }
 
-function createSide(id, name, element) {
+function createSpellLoadout(names, config) {
+  return names.map((name, index) => ({
+    id: `spell-${name.toLowerCase().replace(/\s+/g, '-')}`,
+    name,
+    family: config.spells.defaultFamilies[index],
+    type: config.spells.types[index],
+    status: config.spells.placeholderStatus,
+    cooldownRemaining: config.match.minHp
+  }));
+}
+
+function createSide(id, name, element, spellNames, config) {
   return {
     id,
     name,
     element,
     hp: CONFIG.match.startingHp,
+    energy: config.match.startingEnergy,
+    maxEnergy: config.match.maxEnergy,
+    spellLoadout: createSpellLoadout(spellNames, config),
     cooldowns: createCooldownMap(),
     activeDefenceSeconds: CONFIG.match.minHp,
     activeBlockSeconds: CONFIG.match.minHp,
@@ -25,7 +39,8 @@ function createSide(id, name, element) {
 
 export function createInitialGameState(config = CONFIG) {
   return {
-    phase: config.match.countdownPhase,
+    phase: config.states.preparation,
+    previousPhase: null,
     countdownRemaining: config.match.countdownSeconds,
     fightBannerRemaining: config.match.minHp,
     matchRemaining: config.match.durationSeconds,
@@ -39,9 +54,15 @@ export function createInitialGameState(config = CONFIG) {
     uiButtons: [],
     voiceStatus: config.input.voiceReadyText,
     voiceListening: false,
+    preparation: {
+      selectedSpellType: config.spells.types[config.match.minHp],
+      draftSpellName: config.spells.defaultPlayerNames[config.match.minHp],
+      patternSummary: config.spells.patternSummaryPlaceholder,
+      effectPreview: config.spells.effectPreviewPlaceholder
+    },
     sides: {
-      [config.match.playerId]: createSide(config.match.playerId, config.text.playerName, config.text.playerElement),
-      [config.match.aiId]: createSide(config.match.aiId, config.text.aiName, config.text.aiElement)
+      [config.match.playerId]: createSide(config.match.playerId, config.text.playerName, config.text.playerElement, config.spells.defaultPlayerNames, config),
+      [config.match.aiId]: createSide(config.match.aiId, config.text.aiName, config.text.aiElement, config.spells.defaultAiNames, config)
     }
   };
 }
