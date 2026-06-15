@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, stat, writeFile, copyFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile, copyFile } from 'node:fs/promises';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -65,10 +65,6 @@ async function build() {
   await mkdir(dist, { recursive: true });
   await copyFile(join(root, 'index.html'), join(dist, 'index.html'));
   await copyFolder(join(root, 'src'), join(dist, 'src'));
-  const docsPath = join(root, 'docs');
-  if ((await stat(docsPath).catch(() => null))?.isDirectory()) {
-    await copyFolder(docsPath, join(dist, 'docs'));
-  }
   await writeFile(join(dist, 'BUILD_OK.txt'), `${CONFIG.meta.title} ${CONFIG.meta.version} build passed.\n`);
   console.log(`${CONFIG.logging.prefix} Build complete: ${relative(root, dist)}`);
 }
