@@ -287,12 +287,119 @@ export const CONFIG = {
     defaultAiNames: ['Long Spark', 'Son Wall', 'Thuy Mend', 'Giong Net', 'Truc Step'],
     // Spell type labels used in the forge selector and spell buttons. Recommended: the five GDD types.
     types: ['Attack', 'Defense', 'Support', 'Control', 'Utility'],
+    // Minimum accepted spell name length before saving a spell. Recommended range: 3-12 characters.
+    minimumNameLength: 3,
+    // Similarity ratio where two names are considered too close. Recommended range: 0.65-0.9.
+    similarNameThreshold: 0.72,
+    // Candidate player spell names cycled by the Canvas name button. Recommended: more than five unique names.
+    nameCycle: ['Long Fire', 'Son Guard', 'Thuy Heal', 'Giong Snare', 'Truc Dash', 'Lua Fang', 'Da Shield', 'Mua Bloom'],
     // Placeholder text for empty or not-yet-editable spell slots. Recommended: short status text.
     placeholderStatus: 'Ready to forge',
     // Static summary text for the Milestone 1 pattern panel before real analysis exists. Recommended: short text.
     patternSummaryPlaceholder: 'Pattern summary placeholder',
     // Static effect preview text before spell rules are implemented. Recommended: short text.
     effectPreviewPlaceholder: 'Effect preview placeholder'
+  },
+
+  patterns: {
+    // Number of points available in the 9-dot grid. Recommended: 9.
+    pointCount: 9,
+    // Lowest valid point id in the grid. Recommended: 1.
+    firstPointId: 1,
+    // Number of rows in the 9-dot spell grid. Recommended: 3.
+    rows: 3,
+    // Number of columns in the 9-dot spell grid. Recommended: 3.
+    columns: 3,
+    // Whether the reverse of an existing connection is allowed. Recommended: false for readable patterns.
+    allowReverseDuplicateConnections: false,
+    // Light spell minimum connection count. Recommended: 1.
+    lightMinConnections: 1,
+    // Light spell maximum connection count. Recommended: 2.
+    lightMaxConnections: 2,
+    // Standard spell minimum connection count. Recommended: 3.
+    standardMinConnections: 3,
+    // Standard spell maximum connection count. Recommended: 4.
+    standardMaxConnections: 4,
+    // Heavy spell minimum connection count. Recommended: 5.
+    heavyMinConnections: 5,
+    // Heavy spell maximum connection count. Recommended: 6.
+    heavyMaxConnections: 6,
+    // Grand spell minimum connection count. Recommended: 7.
+    grandMinConnections: 7,
+    // Unique points required to add a secondary effect. Recommended: 5.
+    uniquePointsForSecondaryEffect: 5,
+    // Extra energy cost added for each crossed line. Recommended range: 1-4.
+    crossedLineEnergyPenalty: 2,
+    // Chance an unstable crossed-line spell misfires during casting. Recommended range: 0.1-0.4.
+    unstableMisfireChance: 0.25,
+    // Minimum generated random pattern connections. Recommended range: 2-4.
+    randomMinConnections: 3,
+    // Maximum generated random pattern connections. Recommended range: 4-8.
+    randomMaxConnections: 6,
+    // Maximum attempts to find a new random connection before scanning for a fallback. Recommended range: 9-40.
+    randomPointAttemptLimit: 18,
+    // Sharp angle count that still has no shield piercing. Recommended: 1.
+    noPierceMaxSharpAngles: 1,
+    // Sharp angle count where low piercing starts. Recommended: 2.
+    lowPierceMinSharpAngles: 2,
+    // Sharp angle count where low piercing ends. Recommended: 3.
+    lowPierceMaxSharpAngles: 3,
+    // Sharp angle count where high piercing starts. Recommended: 4.
+    highPierceMinSharpAngles: 4,
+    // Low shield piercing percent. Recommended: 0.25.
+    lowPiercePercent: 0.25,
+    // High shield piercing percent. Recommended: 0.5.
+    highPiercePercent: 0.5,
+    // Dot-product angle threshold used to count a corner as sharp. Recommended range: -0.2 to 0.4.
+    sharpAngleDotThreshold: 0.35,
+    // Multiplier used to format decimal rates as percentages. Recommended: 100.
+    percentMultiplier: 100,
+    // Weight label for 1-2 connection spells. Recommended: Light.
+    lightLabel: 'Light',
+    // Weight label for 3-4 connection spells. Recommended: Standard.
+    standardLabel: 'Standard',
+    // Weight label for 5-6 connection spells. Recommended: Heavy.
+    heavyLabel: 'Heavy',
+    // Weight label for 7+ connection spells. Recommended: Grand.
+    grandLabel: 'Grand',
+    // Weight label for patterns without enough connections. Recommended: Unformed.
+    unformedLabel: 'Unformed'
+  },
+
+  spellCosts: {
+    // Energy cost for Light spells before crossed-line penalties. Recommended: 4.
+    Light: 4,
+    // Energy cost for Standard spells before crossed-line penalties. Recommended: 6.
+    Standard: 6,
+    // Energy cost for Heavy spells before crossed-line penalties. Recommended: 8.
+    Heavy: 8,
+    // Energy cost for Grand spells before crossed-line penalties. Recommended: 10.
+    Grand: 10,
+    // Energy cost shown before a valid pattern exists. Recommended: 0.
+    Unformed: 0
+  },
+
+  spellEffects: {
+    // Attack spell damage by weight before combat mitigation. Recommended: 12, 18, 24, 30.
+    attackDamageByWeight: { Light: 12, Standard: 18, Heavy: 24, Grand: 30, Unformed: 0 },
+    // Defense spell shield amount by weight. Recommended: 16, 24, 32, 40.
+    defenseShieldByWeight: { Light: 16, Standard: 24, Heavy: 32, Grand: 40, Unformed: 0 },
+    // Support spell healing by weight. Recommended: 8, 12, 16, 20.
+    supportHealByWeight: { Light: 8, Standard: 12, Heavy: 16, Grand: 20, Unformed: 0 },
+    // Control spell slow duration by weight in seconds. Recommended: 1.5-3.
+    controlSlowSecondsByWeight: { Light: 1.5, Standard: 2, Heavy: 2.5, Grand: 3, Unformed: 0 },
+    // Utility spell bonus regeneration duration by weight in seconds. Recommended: 2-5.
+    utilityBonusSecondsByWeight: { Light: 2, Standard: 3, Heavy: 4, Grand: 5, Unformed: 0 },
+    // Closed Attack pattern bonus damage. Recommended: 3.
+    closedAttackBonusDamage: 3,
+    // Closed Defense pattern bonus shield. Recommended: 4.
+    closedDefenseBonusShield: 4,
+    // Closed Support pattern bonus healing. Recommended: 3.
+    closedSupportBonusHeal: 3,
+    // Closed Control pattern bonus duration in seconds. Recommended: 0.5.
+    closedControlBonusSeconds: 0.5,
+    // Closed Utility pattern bonus duration in seconds. Recommended: 1.
+    closedUtilityBonusSeconds: 1
   },
 
   input: {
@@ -391,6 +498,18 @@ export const CONFIG = {
     prepButtonWidth: 210,
     // Height for preparation action buttons in pixels. Recommended range: 42-64.
     prepButtonHeight: 52,
+    // Spell type button width in pixels. Recommended range: 88-128.
+    spellTypeButtonWidth: 98,
+    // Spell type button height in pixels. Recommended range: 34-52.
+    spellTypeButtonHeight: 40,
+    // Gap between spell type buttons in pixels. Recommended range: 6-14.
+    spellTypeButtonGap: 8,
+    // Number of spell type buttons per row. Recommended range: 2-4.
+    spellTypeButtonColumns: 3,
+    // Name field height in pixels. Recommended range: 38-58.
+    spellNameFieldHeight: 46,
+    // Save spell button width in pixels. Recommended range: 140-220.
+    saveSpellButtonWidth: 160,
     // Bottom margin for command HUD in pixels. Recommended range: 16–40.
     bottomMargin: 20,
     // Vertical placement for the arena horizon in pixels. Recommended range: 240–420.
@@ -513,6 +632,24 @@ export const CONFIG = {
     randomPatternLabel: 'Random Pattern',
     // Confirm loadout button label. Recommended: short command text.
     confirmLoadoutLabel: 'Preview Match',
+    // Save spell button label. Recommended: short command text.
+    saveSpellLabel: 'Save Spell',
+    // Cycle spell name button label. Recommended: short command text.
+    cycleNameLabel: 'Cycle Name',
+    // Clear pattern button label. Recommended: short command text.
+    clearPatternLabel: 'Clear Pattern',
+    // Preparation feedback shown before any save attempt. Recommended: short sentence.
+    prepReadyFeedback: 'Draw a pattern, choose a type, name it, then save five spells.',
+    // Feedback shown after a spell is saved. Recommended: short sentence.
+    spellSavedFeedback: 'Spell saved.',
+    // Feedback shown when a spell name is duplicate or too similar. Recommended: short sentence.
+    spellNameRejectedFeedback: 'Use a unique, less similar spell name.',
+    // Feedback shown when the pattern has too few connections. Recommended: short sentence.
+    patternRejectedFeedback: 'Connect at least one line before saving.',
+    // Feedback shown when all five slots are ready. Recommended: short sentence.
+    loadoutReadyFeedback: 'Five-spell loadout ready.',
+    // Feedback shown when loadout confirmation is blocked. Recommended: short sentence.
+    loadoutBlockedFeedback: 'Fill all five spell slots first.',
     // Match preview back button label. Recommended: short command text.
     backToForgeLabel: 'Back To Forge',
     // Match screen static heading. Recommended: short text.

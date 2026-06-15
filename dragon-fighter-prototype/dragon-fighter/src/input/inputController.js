@@ -3,6 +3,8 @@ import { commandTextForAction, getActionByKey, truncateTranscript } from '../com
 import { attemptCommand } from '../combat/matchRules.js';
 import { resetGameState } from '../core/gameState.js';
 import { showMatchPreview, showPreparation } from '../core/stateMachine.js';
+import { addPatternPoint, clearDraftPattern, confirmLoadout, cycleDraftName, editDraftName, randomizeDraftPattern, saveDraftSpell, selectSpellType } from '../states/preparationState.js';
+import { getEggGridPoints, getPreparationRects } from '../ui/layout.js';
 
 function mapPointerToCanvas(event, canvas, config) {
   const rect = canvas.getBoundingClientRect();
@@ -22,11 +24,19 @@ function findButtonAtPoint(state, point) {
   return state.uiButtons.find((button) => pointInRect(point, button.rect)) ?? null;
 }
 
+function findGridPointAtPoint(point, config) {
+  return getEggGridPoints(config).find((gridPoint) => {
+    const dx = point.x - gridPoint.x;
+    const dy = point.y - gridPoint.y;
+    return Math.hypot(dx, dy) <= gridPoint.radius * config.match.sideCount;
+  }) ?? null;
+}
+
 function getSpeechRecognitionConstructor(windowRef) {
   return windowRef.SpeechRecognition ?? windowRef.webkitSpeechRecognition ?? null;
 }
 
-export function createInputController({ canvas, state, logger, config = CONFIG, windowRef = window }) {
+export function createInputController({ canvas, state, logger, random = Math.random, config = CONFIG, windowRef = window }) {
   const SpeechRecognition = getSpeechRecognitionConstructor(windowRef);
   let recognizer = null;
 
@@ -86,8 +96,43 @@ export function createInputController({ canvas, state, logger, config = CONFIG, 
   function handleCanvasPointer(event) {
     event.preventDefault();
     const point = mapPointerToCanvas(event, canvas, config);
+    const prepRects = getPreparationRects(config);
+    if (state.phase === config.states.preparation) {
+      state.preparation.nameFieldFocused = pointInRect(point, prepRects.nameField);
+      const gridPoint = findGridPointAtPoint(point, config);
+      if (gridPoint) {
+        addPatternPoint(state, gridPoint.id, logger, config);
+        return;
+      }
+    }
+
     const button = findButtonAtPoint(state, point);
     if (!button) return;
+
+    if (button.kind === 'spell-type') {
+      selectSpellType(state, button.spellType, logger, config);
+      return;
+    }
+
+    if (button.kind === 'random-pattern') {
+      randomizeDraftPattern(state, random, logger, config);
+      return;
+    }
+
+    if (button.kind === 'clear-pattern') {
+      clearDraftPattern(state, logger, config);
+      return;
+    }
+
+    if (button.kind === 'cycle-name') {
+      cycleDraftName(state, logger, config);
+      return;
+    }
+
+    if (button.kind === 'save-spell') {
+      saveDraftSpell(state, logger, config);
+      return;
+    }
 
     if (button.kind === 'action') {
       submitAction(button.actionId, 'canvas-button');
@@ -105,7 +150,7 @@ export function createInputController({ canvas, state, logger, config = CONFIG, 
     }
 
     if (button.kind === 'preview-match') {
-      showMatchPreview(state, logger, config);
+      confirmLoadout(state, logger, config);
       return;
     }
 
@@ -132,6 +177,11 @@ export function createInputController({ canvas, state, logger, config = CONFIG, 
     if (key === config.input.voiceKey) {
       event.preventDefault();
       startVoiceRecognition();
+      return;
+    }
+
+    if (state.phase === config.states.preparation && editDraftName(state, event.key, logger, config)) {
+      event.preventDefault();
     }
   }
 

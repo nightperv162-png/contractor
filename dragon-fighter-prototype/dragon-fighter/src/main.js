@@ -34,7 +34,7 @@ function boot() {
   prepareCanvas(canvas, CONFIG);
   renderGame(canvas, context, state, CONFIG);
 
-  const input = createInputController({ canvas, state, logger, config: CONFIG, windowRef: window });
+  const input = createInputController({ canvas, state, logger, random, config: CONFIG, windowRef: window });
   input.attach();
 
   const loop = createGameLoop({ state, canvas, context, random, logger, config: CONFIG });

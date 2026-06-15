@@ -1,18 +1,14 @@
 import { ACTION_IDS, CONFIG } from '../config.js';
+import { analyzePattern } from '../spells/patternAnalyzer.js';
+import { createEmptySpellSlot } from '../spells/spellLoadout.js';
+import { formatPatternSummary, getSpellEffectPreview } from '../spells/spellRules.js';
 
 function createCooldownMap() {
   return Object.fromEntries(ACTION_IDS.map((actionId) => [actionId, CONFIG.match.minHp]));
 }
 
 function createSpellLoadout(names, config) {
-  return names.map((name, index) => ({
-    id: `spell-${name.toLowerCase().replace(/\s+/g, '-')}`,
-    name,
-    family: config.spells.defaultFamilies[index],
-    type: config.spells.types[index],
-    status: config.spells.placeholderStatus,
-    cooldownRemaining: config.match.minHp
-  }));
+  return names.map((name, index) => createEmptySpellSlot(index, config));
 }
 
 function createSide(id, name, element, spellNames, config) {
@@ -38,6 +34,8 @@ function createSide(id, name, element, spellNames, config) {
 }
 
 export function createInitialGameState(config = CONFIG) {
+  const initialPattern = [];
+  const initialAnalysis = analyzePattern(initialPattern, config);
   return {
     phase: config.states.preparation,
     previousPhase: null,
@@ -57,8 +55,15 @@ export function createInitialGameState(config = CONFIG) {
     preparation: {
       selectedSpellType: config.spells.types[config.match.minHp],
       draftSpellName: config.spells.defaultPlayerNames[config.match.minHp],
-      patternSummary: config.spells.patternSummaryPlaceholder,
-      effectPreview: config.spells.effectPreviewPlaceholder
+      draftPatternPoints: initialPattern,
+      draftAnalysis: initialAnalysis,
+      patternSummary: formatPatternSummary(initialAnalysis, config),
+      effectPreview: getSpellEffectPreview(config.spells.types[config.match.minHp], initialAnalysis, config),
+      feedback: config.text.prepReadyFeedback,
+      nameCycleIndex: config.match.minHp,
+      selectedSlotIndex: config.match.minHp,
+      nameFieldFocused: false,
+      loadoutConfirmed: false
     },
     sides: {
       [config.match.playerId]: createSide(config.match.playerId, config.text.playerName, config.text.playerElement, config.spells.defaultPlayerNames, config),

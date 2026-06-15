@@ -1,7 +1,7 @@
 import { ACTION_IDS, CONFIG } from '../config.js';
 import { formatCommandReference } from '../combat/actions.js';
 import { getVisibleStateLabel } from '../core/gameState.js';
-import { getActionButtonRects, getPreparationRects, getSpellButtonRects } from '../ui/layout.js';
+import { getActionButtonRects, getEggGridPoints, getPreparationRects, getSpellButtonRects, getSpellTypeButtonRects } from '../ui/layout.js';
 
 function font(size, weight, config) {
   return `${weight} ${size}px ${config.fonts.family}`;
@@ -277,8 +277,8 @@ function drawLatestPanel(ctx, x, y, title, value, reason, config) {
   ctx.fillText(value, x + config.layout.outerPadding, y + config.layout.outerPadding + config.layout.cooldownChipGap);
 }
 
-function registerButton(state, id, kind, label, rect, actionId) {
-  state.uiButtons.push({ id, kind, label, rect, actionId });
+function registerButton(state, id, kind, label, rect, actionId, metadata = {}) {
+  state.uiButtons.push({ id, kind, label, rect, actionId, ...metadata });
 }
 
 function drawButton(ctx, state, id, kind, label, rect, actionId, config) {
@@ -371,36 +371,63 @@ function drawPreparationHeader(ctx, config) {
 }
 
 function drawEggGrid(ctx, rect, config) {
-  const gridWidth = config.layout.eggGridGap * (config.layout.eggGridColumns - (config.match.sideCount - 1));
-  const gridHeight = config.layout.eggGridGap * (config.layout.eggGridRows - (config.match.sideCount - 1));
-  const startX = rect.x + (rect.width - gridWidth) / config.match.sideCount;
-  const startY = rect.y + config.layout.outerPadding * config.match.sideCount;
-
   ctx.strokeStyle = config.colors.arenaLine;
   ctx.lineWidth = config.layout.panelLineWidth;
-  for (let row = config.match.minHp; row < config.layout.eggGridRows; row += config.match.energyRegenPerSecond) {
-    for (let column = config.match.minHp; column < config.layout.eggGridColumns; column += config.match.energyRegenPerSecond) {
-      const x = startX + column * config.layout.eggGridGap;
-      const y = startY + row * config.layout.eggGridGap;
-      ctx.beginPath();
-      ctx.arc(x, y, config.layout.eggGridPointRadius, config.match.minHp, Math.PI * config.match.sideCount);
-      ctx.fillStyle = config.colors.cooldownReady;
-      ctx.fill();
-      ctx.stroke();
-    }
-  }
+  getEggGridPoints(config).forEach((point) => {
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, point.radius, config.match.minHp, Math.PI * config.match.sideCount);
+    ctx.fillStyle = config.colors.cooldownReady;
+    ctx.fill();
+    ctx.stroke();
+  });
+}
+
+function drawDraftPattern(ctx, state, config) {
+  const gridPoints = getEggGridPoints(config);
+  const pointById = new Map(gridPoints.map((point) => [point.id, point]));
+  const points = state.preparation.draftPatternPoints;
+  ctx.strokeStyle = config.colors.skillEffect;
+  ctx.lineWidth = config.layout.effectLineWidth / config.match.sideCount;
+  ctx.beginPath();
+  points.forEach((pointId, index) => {
+    const point = pointById.get(pointId);
+    if (!point) return;
+    if (index === config.match.minHp) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  });
+  ctx.stroke();
+
+  points.forEach((pointId) => {
+    const point = pointById.get(pointId);
+    if (!point) return;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, point.radius + config.layout.panelLineWidth, config.match.minHp, Math.PI * config.match.sideCount);
+    ctx.fillStyle = config.colors.skillEffect;
+    ctx.fill();
+  });
 }
 
 function drawPreparationPanelText(ctx, rect, state, config) {
   drawSectionTitle(ctx, config.text.spellTypeTitle, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding, config);
-  ctx.font = font(config.fonts.normalSize, config.fonts.boldWeight, config);
-  ctx.fillStyle = config.colors.cooldownReady;
-  ctx.fillText(state.preparation.selectedSpellType, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.fonts.normalSize + config.layout.cooldownChipGap);
+  getSpellTypeButtonRects(config).forEach((button) => {
+    registerButton(state, button.id, button.kind, button.label, button.rect, null, { spellType: button.spellType });
+    const selected = button.spellType === state.preparation.selectedSpellType;
+    drawRoundedRect(ctx, button.rect.x, button.rect.y, button.rect.width, button.rect.height, config.layout.cornerRadius, selected ? config.colors.buttonHighlight : config.colors.buttonFill, config.colors.panelStroke, config.layout.panelLineWidth / config.match.sideCount, config);
+    ctx.font = font(config.fonts.smallSize, config.fonts.boldWeight, config);
+    ctx.fillStyle = config.colors.textPrimary;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(button.label, button.rect.x + button.rect.width / config.match.sideCount, button.rect.y + button.rect.height / config.match.sideCount);
+  });
 
   drawSectionTitle(ctx, config.text.spellNameTitle, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.layout.statusPanelHeight, config);
+  const prepRects = getPreparationRects(config);
+  drawRoundedRect(ctx, prepRects.nameField.x, prepRects.nameField.y, prepRects.nameField.width, prepRects.nameField.height, config.layout.cornerRadius, config.colors.buttonFill, state.preparation.nameFieldFocused ? config.colors.cooldownReady : config.colors.panelStroke, config.layout.panelLineWidth, config);
   ctx.font = font(config.fonts.normalSize, config.fonts.boldWeight, config);
   ctx.fillStyle = config.colors.textPrimary;
-  ctx.fillText(state.preparation.draftSpellName, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.layout.statusPanelHeight + config.fonts.normalSize + config.layout.cooldownChipGap);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(state.preparation.draftSpellName, prepRects.nameField.x + config.layout.cooldownChipGap, prepRects.nameField.y + prepRects.nameField.height / config.match.sideCount);
 
   drawSectionTitle(ctx, config.text.patternSummaryTitle, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.layout.statusPanelHeight * config.match.sideCount, config);
   ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
@@ -411,6 +438,8 @@ function drawPreparationPanelText(ctx, rect, state, config) {
   ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
   ctx.fillStyle = config.colors.textSecondary;
   ctx.fillText(state.preparation.effectPreview, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding + config.layout.statusPanelHeight * config.layout.panelLineWidth + config.fonts.normalSize + config.layout.cooldownChipGap);
+
+  drawButton(ctx, state, 'cycle-name', 'cycle-name', config.text.cycleNameLabel, prepRects.cycleNameButton, null, config);
 }
 
 function drawSpellSlots(ctx, rect, state, config) {
@@ -436,14 +465,23 @@ function drawPreparationScreen(ctx, state, config) {
   panel(ctx, rects.eggDrawing.x, rects.eggDrawing.y, rects.eggDrawing.width, rects.eggDrawing.height, config);
   drawSectionTitle(ctx, config.text.eggDrawingTitle, rects.eggDrawing.x + config.layout.outerPadding, rects.eggDrawing.y + config.layout.outerPadding, config);
   drawEggGrid(ctx, rects.eggDrawing, config);
+  drawDraftPattern(ctx, state, config);
 
   panel(ctx, rects.forgePanel.x, rects.forgePanel.y, rects.forgePanel.width, rects.forgePanel.height, config);
   drawPreparationPanelText(ctx, rects.forgePanel, state, config);
-  drawButton(ctx, state, 'random-pattern', 'static', config.text.randomPatternLabel, rects.randomPatternButton, null, config);
+  drawButton(ctx, state, 'random-pattern', 'random-pattern', config.text.randomPatternLabel, rects.randomPatternButton, null, config);
+  drawButton(ctx, state, 'clear-pattern', 'clear-pattern', config.text.clearPatternLabel, rects.clearPatternButton, null, config);
 
   panel(ctx, rects.spellSlots.x, rects.spellSlots.y, rects.spellSlots.width, rects.spellSlots.height, config);
   drawSpellSlots(ctx, rects.spellSlots, state, config);
+  drawButton(ctx, state, 'save-spell', 'save-spell', config.text.saveSpellLabel, rects.saveSpellButton, null, config);
   drawButton(ctx, state, 'preview-match', 'preview-match', config.text.confirmLoadoutLabel, rects.confirmLoadoutButton, null, config);
+
+  ctx.font = font(config.fonts.smallSize, config.fonts.boldWeight, config);
+  ctx.fillStyle = state.preparation.loadoutConfirmed ? config.colors.cooldownReady : config.colors.textSecondary;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(state.preparation.feedback, config.canvas.width / config.match.sideCount, config.canvas.height - config.layout.bottomMargin);
 }
 
 function drawOverlays(ctx, state, config) {
