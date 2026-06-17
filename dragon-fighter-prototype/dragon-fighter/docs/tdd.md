@@ -259,7 +259,7 @@ Every item below belongs in `src/config.js` or an equivalent single centralized 
 
 ### Match Stats
 
-- `match.startingHp`, `match.minHp`, `match.startingEnergy`, `match.minEnergy`, `match.maxEnergy`, `match.energyRegenPerSecond`
+- `match.startingHp`, `match.minHp`, `match.startingEnergy`, `match.minEnergy`, `match.maxEnergy`, `match.energyRegenPerSecond`, `match.energyDisplayRoundingMode`
 - `match.sideCount`, `match.playerId`, `match.aiId`
 - `match.countdownPhase`, `match.activePhase`, `match.resultPhase`
 - `match.winLabel`, `match.loseLabel`, `match.drawLabel`, `match.restartHint`
@@ -318,7 +318,7 @@ Every item below belongs in `src/config.js` or an equivalent single centralized 
 - `layout.eggDrawingX`, `layout.eggDrawingY`, `layout.eggDrawingWidth`, `layout.eggDrawingHeight`
 - `layout.eggGridGap`, `layout.eggGridRows`, `layout.eggGridColumns`, `layout.eggGridPointRadius`
 - `layout.forgePanelX`, `layout.forgePanelY`, `layout.forgePanelWidth`, `layout.forgePanelHeight`
-- `layout.spellSlotsX`, `layout.spellSlotsY`, `layout.spellSlotsWidth`, `layout.spellSlotsHeight`, `layout.spellSlotHeight`, `layout.spellSlotGap`
+- `layout.spellSlotsX`, `layout.spellSlotsY`, `layout.spellSlotsWidth`, `layout.spellSlotsHeight`, `layout.spellSlotHeight`, `layout.spellSlotGap`, `layout.deleteSpellButtonWidth`, `layout.deleteSpellButtonHeight`
 - `layout.prepButtonWidth`, `layout.prepButtonHeight`, `layout.spellTypeButtonWidth`, `layout.spellTypeButtonHeight`, `layout.spellTypeButtonGap`, `layout.spellTypeButtonColumns`
 - `layout.spellNameFieldHeight`, `layout.saveSpellButtonWidth`
 
@@ -340,9 +340,9 @@ Every item below belongs in `src/config.js` or an equivalent single centralized 
 
 - Names and identity: `text.playerName`, `text.aiName`, `text.playerElement`, `text.aiElement`
 - Headings: `text.commandReferenceTitle`, `text.preparationTitle`, `text.preparationSubtitle`, `text.eggDrawingTitle`, `text.spellTypeTitle`, `text.spellNameTitle`, `text.effectPreviewTitle`, `text.spellSlotsTitle`, `text.matchPreviewTitle`
-- Buttons: `text.randomPatternLabel`, `text.confirmLoadoutLabel`, `text.saveSpellLabel`, `text.cycleNameLabel`, `text.clearPatternLabel`, `text.backToForgeLabel`
-- Feedback: `text.prepReadyFeedback`, `text.spellSavedFeedback`, `text.spellNameRejectedFeedback`, `text.patternRejectedFeedback`, `text.loadoutReadyFeedback`, `text.loadoutBlockedFeedback`
-- HUD and hints: `text.energyLabel`, `text.microphoneStateLabel`, `text.latestPlayerTitle`, `text.latestAiTitle`, `text.noPlayerCommand`, `text.noAiCommand`, `text.fallbackHint`, `text.assetWarning`
+- Buttons: `text.randomPatternLabel`, `text.confirmLoadoutLabel`, `text.saveSpellLabel`, `text.deleteSpellLabel`, `text.cycleNameLabel`, `text.clearPatternLabel`, `text.backToForgeLabel`
+- Feedback: `text.prepReadyFeedback`, `text.spellSavedFeedback`, `text.spellSelectedFeedback`, `text.spellDeletedFeedback`, `text.spellNameRejectedFeedback`, `text.patternRejectedFeedback`, `text.loadoutReadyFeedback`, `text.loadoutBlockedFeedback`
+- HUD and hints: `text.energyLabel`, `text.energyShortLabel`, `text.microphoneStateLabel`, `text.latestPlayerTitle`, `text.latestAiTitle`, `text.noPlayerCommand`, `text.noAiCommand`, `text.fallbackHint`, `text.assetWarning`
 
 ## Known Technical Debt
 

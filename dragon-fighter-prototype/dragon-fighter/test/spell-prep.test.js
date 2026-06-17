@@ -7,7 +7,7 @@ import { analyzePattern, generateRandomPattern, getPiercePercent, getWeightBand 
 import { createSpell } from '../src/spells/spellFactory.js';
 import { getNameSimilarity, validateLoadout, validateSpellName } from '../src/spells/spellLoadout.js';
 import { getSpellEffectPreview } from '../src/spells/spellRules.js';
-import { addPatternPoint, confirmLoadout, cycleDraftName, randomizeDraftPattern, saveDraftSpell, selectSpellType, setDraftName } from '../src/states/preparationState.js';
+import { addPatternPoint, confirmLoadout, cycleDraftName, deletePreparedSpell, randomizeDraftPattern, saveDraftSpell, selectPreparedSpellSlot, selectSpellType, setDraftName } from '../src/states/preparationState.js';
 
 test('pattern analysis counts connections, weight bands, cost, secondary effect, and pierce', () => {
   assert.equal(getWeightBand(1, CONFIG), CONFIG.patterns.lightLabel);
@@ -102,6 +102,33 @@ test('preparation flow draws, randomizes, saves five spells, and confirms loadou
   assert.equal(confirmLoadout(state, null, CONFIG).ok, true);
   assert.equal(state.phase, CONFIG.match.countdownPhase);
   assert.equal(state.countdownRemaining, CONFIG.match.countdownSeconds);
+});
+
+test('prepared spell slots can be selected, deleted, and refilled', () => {
+  const state = createInitialGameState(CONFIG);
+
+  CONFIG.spells.types.forEach((type, index) => {
+    selectSpellType(state, type, null, CONFIG);
+    setDraftName(state, CONFIG.spells.defaultPlayerNames[index], null, CONFIG);
+    state.preparation.draftPatternPoints = [1, 2 + index % CONFIG.patterns.columns];
+    const result = saveDraftSpell(state, null, CONFIG);
+    assert.equal(result.ok, true);
+  });
+
+  assert.equal(validateLoadout(state.sides[CONFIG.match.playerId].spellLoadout, CONFIG).ok, true);
+  assert.equal(selectPreparedSpellSlot(state, 2, null, CONFIG), true);
+  const deleted = deletePreparedSpell(state, null, CONFIG);
+  assert.equal(deleted.ok, true);
+  assert.equal(state.sides[CONFIG.match.playerId].spellLoadout[2].filled, false);
+  assert.equal(validateLoadout(state.sides[CONFIG.match.playerId].spellLoadout, CONFIG).ok, false);
+
+  selectSpellType(state, 'Attack', null, CONFIG);
+  setDraftName(state, 'Dark Slash', null, CONFIG);
+  state.preparation.draftPatternPoints = [1, 2];
+  const refill = saveDraftSpell(state, null, CONFIG);
+  assert.equal(refill.ok, true);
+  assert.equal(refill.slotIndex, 2);
+  assert.equal(state.sides[CONFIG.match.playerId].spellLoadout[2].name, 'Dark Slash');
 });
 
 test('spell name editing blocks number keys from casting spell slots', () => {

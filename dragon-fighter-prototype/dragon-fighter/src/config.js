@@ -139,6 +139,8 @@ export const CONFIG = {
     maxEnergy: 30,
     // Energy regenerated each second during active combat. Recommended range: 0.5-3.
     energyRegenPerSecond: 1,
+    // Rounding mode used only for displayed energy numbers. Recommended: floor to avoid overpromising spendable energy.
+    energyDisplayRoundingMode: 'floor',
     // Lowest allowed HP value. Recommended: 0.
     minHp: 0,
     // Number of players in the prototype. Recommended: 2 for this vertical slice.
@@ -457,6 +459,10 @@ export const CONFIG = {
     spellSlotHeight: 58,
     // Gap between spell slot rows in pixels. Recommended range: 6-16.
     spellSlotGap: 10,
+    // Width for the delete-selected-spell button in pixels. Recommended range: 80-130.
+    deleteSpellButtonWidth: 90,
+    // Height for the delete-selected-spell button in pixels. Recommended range: 26-38.
+    deleteSpellButtonHeight: 32,
     // Width for preparation action buttons in pixels. Recommended range: 160-260.
     prepButtonWidth: 210,
     // Height for preparation action buttons in pixels. Recommended range: 42-64.
@@ -619,6 +625,8 @@ export const CONFIG = {
     confirmLoadoutLabel: 'Start Match',
     // Save spell button label. Recommended: short command text.
     saveSpellLabel: 'Save Spell',
+    // Delete selected spell button label. Recommended: short command text.
+    deleteSpellLabel: 'Delete',
     // Cycle spell name button label. Recommended: short command text.
     cycleNameLabel: 'Cycle Name',
     // Clear pattern button label. Recommended: short command text.
@@ -633,6 +641,10 @@ export const CONFIG = {
     patternRejectedFeedback: 'Connect at least one line before saving.',
     // Feedback shown when all five slots are ready. Recommended: short sentence.
     loadoutReadyFeedback: 'Five-spell loadout ready.',
+    // Feedback shown after a prepared spell slot is selected. Recommended: short sentence.
+    spellSelectedFeedback: 'Spell slot selected.',
+    // Feedback shown after a prepared spell is deleted. Recommended: short sentence.
+    spellDeletedFeedback: 'Spell deleted. Save a new spell to refill the slot.',
     // Feedback shown when loadout confirmation is blocked. Recommended: short sentence.
     loadoutBlockedFeedback: 'Fill all five spell slots first.',
     // Match preview back button label. Recommended: short command text.
@@ -641,6 +653,8 @@ export const CONFIG = {
     matchPreviewTitle: 'Match Layout',
     // Energy label text used in HUD panels. Recommended: short text.
     energyLabel: 'Energy',
+    // Short energy label used inside compact spell buttons. Recommended: 1-3 letters.
+    energyShortLabel: 'EN',
     // Microphone status label used in match HUD. Recommended: short text.
     microphoneStateLabel: 'Mic',
     // Latest player command heading. Recommended: short text.

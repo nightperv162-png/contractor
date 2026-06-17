@@ -60,6 +60,12 @@ export function getPreparationRects(config = CONFIG) {
       width: config.layout.cycleNameButtonWidth,
       height: config.layout.spellNameFieldHeight
     },
+    deleteSpellButton: {
+      x: config.layout.spellSlotsX + config.layout.spellSlotsWidth - config.layout.outerPadding - config.layout.deleteSpellButtonWidth,
+      y: config.layout.spellSlotsY + config.layout.outerPadding / config.match.sideCount,
+      width: config.layout.deleteSpellButtonWidth,
+      height: config.layout.deleteSpellButtonHeight
+    },
     effectPreviewPanel: {
       x: config.layout.forgePanelX + config.layout.outerPadding,
       y: config.layout.forgePanelY + config.layout.effectPreviewPanelY,
@@ -91,6 +97,24 @@ export function getPreparationRects(config = CONFIG) {
       height: config.layout.prepButtonHeight
     }
   };
+}
+
+export function getPreparationSpellSlotRects(config = CONFIG) {
+  const rect = getPreparationRects(config).spellSlots;
+  return Array.from({ length: config.spells.perLoadout }, (_, index) => {
+    const slotY = rect.y + config.layout.outerPadding + config.fonts.normalSize + config.layout.cooldownChipGap + index * (config.layout.spellSlotHeight + config.layout.spellSlotGap);
+    return {
+      id: `prep-spell-slot-${index + config.patterns.firstPointId}`,
+      kind: 'preparation-spell-slot',
+      spellIndex: index,
+      rect: {
+        x: rect.x + config.layout.outerPadding,
+        y: slotY,
+        width: rect.width - config.layout.outerPadding * config.match.sideCount,
+        height: config.layout.spellSlotHeight
+      }
+    };
+  });
 }
 
 export function getEggGridPoints(config = CONFIG) {

@@ -22,9 +22,10 @@ The current design direction is spell-first combat. Prepared spell names, spell 
 - Spell type selection: Attack, Defense, Support, Control, Utility.
 - Spell name editing and cycling.
 - Type-specific effect preview with weight, energy cost, piercing, secondary effect, closed bonus, and instability.
-- Five spell slots with duplicate and too-similar name rejection.
+- Five spell slots with duplicate and too-similar name rejection, slot selection, and spell deletion for refilling a slot.
 - Loadout confirmation into countdown, then active match.
 - Match screen with dragons, player panels, HP/energy display, state labels, latest feedback, spell buttons, and microphone status.
+- Combat spell buttons show each spell's energy cost and cooldown state.
 - Player spell casting through voice, keyboard slots, and Canvas spell buttons.
 - Attack, Defense, Support, Control, and Utility effects applied to the live match.
 - Cooldown countdowns, energy regeneration, hit text, shield aura, projectile effects, and result overlay.

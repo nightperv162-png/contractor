@@ -2,7 +2,7 @@ import { CONFIG } from '../config.js';
 import { startMatchCountdown } from '../core/stateMachine.js';
 import { addPointToPattern, analyzePattern, generateRandomPattern } from '../spells/patternAnalyzer.js';
 import { createSpell, normalizeSpellName } from '../spells/spellFactory.js';
-import { nextOpenSlotIndex, validateLoadout, validateSpellName } from '../spells/spellLoadout.js';
+import { createEmptySpellSlot, nextOpenSlotIndex, validateLoadout, validateSpellName } from '../spells/spellLoadout.js';
 import { getSpellEffectPreview } from '../spells/spellRules.js';
 import { createSeededRandom } from '../core/random.js';
 
@@ -128,6 +128,32 @@ export function saveDraftSpell(state, logger, config = CONFIG) {
   state.preparation.feedback = `${config.text.spellSavedFeedback} ${spell.name}`;
   logger?.info('Spell saved', { slotIndex, spell });
   return { ok: true, reason: config.combat.successReason, spell, slotIndex };
+}
+
+export function selectPreparedSpellSlot(state, slotIndex, logger, config = CONFIG) {
+  if (slotIndex < config.match.minHp || slotIndex >= config.spells.perLoadout) return false;
+  state.preparation.selectedSlotIndex = slotIndex;
+  const spell = state.sides[config.match.playerId].spellLoadout[slotIndex];
+  state.preparation.feedback = spell.filled ? `${config.text.spellSelectedFeedback} ${spell.name}` : config.text.prepReadyFeedback;
+  logger?.info('Prepared spell slot selected', { slotIndex, spell: spell.name, filled: spell.filled });
+  return true;
+}
+
+export function deletePreparedSpell(state, logger, config = CONFIG) {
+  const slotIndex = state.preparation.selectedSlotIndex;
+  if (slotIndex < config.match.minHp || slotIndex >= config.spells.perLoadout) return { ok: false, reason: config.text.loadoutBlockedFeedback };
+  const spell = state.sides[config.match.playerId].spellLoadout[slotIndex];
+  if (!spell?.filled) {
+    state.preparation.feedback = config.text.loadoutBlockedFeedback;
+    logger?.warn('Prepared spell delete blocked', { slotIndex, reason: state.preparation.feedback });
+    return { ok: false, reason: state.preparation.feedback };
+  }
+
+  state.sides[config.match.playerId].spellLoadout[slotIndex] = createEmptySpellSlot(slotIndex, config);
+  state.preparation.loadoutConfirmed = false;
+  state.preparation.feedback = config.text.spellDeletedFeedback;
+  logger?.info('Prepared spell deleted', { slotIndex, deletedSpell: spell.name });
+  return { ok: true, reason: config.combat.successReason, slotIndex };
 }
 
 export function confirmLoadout(state, logger, config = CONFIG) {

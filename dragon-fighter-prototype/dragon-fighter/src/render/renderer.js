@@ -1,6 +1,6 @@
 import { CONFIG } from '../config.js';
 import { getVisibleStateLabel } from '../core/gameState.js';
-import { getEggGridPoints, getPreparationRects, getSpellButtonRects, getSpellTypeButtonRects } from '../ui/layout.js';
+import { getEggGridPoints, getPreparationRects, getPreparationSpellSlotRects, getSpellButtonRects, getSpellTypeButtonRects } from '../ui/layout.js';
 
 function font(size, weight, config) {
   return `${weight} ${size}px ${config.fonts.family}`;
@@ -30,6 +30,13 @@ function drawRoundedRect(ctx, x, y, width, height, radius, fill, stroke, lineWid
 
 function centeredX(width, config) {
   return (config.canvas.width - width) / config.match.sideCount;
+}
+
+function formatEnergy(value, config) {
+  if (config.match.energyDisplayRoundingMode === 'floor') return Math.floor(value);
+  if (config.match.energyDisplayRoundingMode === 'ceil') return Math.ceil(value);
+  if (config.match.energyDisplayRoundingMode === 'round') return Math.round(value);
+  return value;
 }
 
 function panel(ctx, x, y, width, height, config) {
@@ -103,7 +110,7 @@ function drawStatusPanel(ctx, side, x, y, alignRight, config) {
   ctx.fillStyle = config.colors.textSecondary;
   ctx.textAlign = alignRight ? 'right' : 'left';
   ctx.fillText(`${side.hp}/${config.match.startingHp} HP`, textX, y + config.layout.hpBarY + config.layout.hpBarHeight + config.layout.cooldownChipGap);
-  ctx.fillText(`${config.text.energyLabel}: ${side.energy}/${side.maxEnergy}`, textX, y + config.layout.hpBarY + config.layout.hpBarHeight + config.layout.cooldownChipGap + config.fonts.smallSize);
+  ctx.fillText(`${config.text.energyLabel}: ${formatEnergy(side.energy, config)}/${side.maxEnergy}`, textX, y + config.layout.hpBarY + config.layout.hpBarHeight + config.layout.cooldownChipGap + config.fonts.smallSize);
 }
 
 function drawTimer(ctx, state, config) {
@@ -295,10 +302,13 @@ function drawSpellButtons(ctx, state, config) {
     ctx.fillStyle = config.colors.textPrimary;
     ctx.font = font(config.fonts.smallSize, config.fonts.boldWeight, config);
     ctx.fillText(spell.name, button.rect.x + button.rect.width / config.match.sideCount, button.rect.y + config.layout.cooldownChipGap * config.match.sideCount);
+    ctx.fillStyle = config.colors.textSecondary;
+    ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
+    ctx.fillText(`${spell.type} | ${spell.energyCost} ${config.text.energyShortLabel}`, button.rect.x + button.rect.width / config.match.sideCount, button.rect.y + button.rect.height / config.match.sideCount);
     ctx.fillStyle = isReady ? config.colors.cooldownReady : config.colors.cooldownBlocked;
     ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
     const cooldownLabel = isReady ? config.combat.cooldownReadyLabel : `${spell.cooldownRemaining.toFixed(config.combat.cooldownDecimalPlaces)}s`;
-    ctx.fillText(`${spell.type} | ${cooldownLabel}`, button.rect.x + button.rect.width / config.match.sideCount, button.rect.y + button.rect.height - config.layout.cooldownChipGap * config.match.sideCount);
+    ctx.fillText(cooldownLabel, button.rect.x + button.rect.width / config.match.sideCount, button.rect.y + button.rect.height - config.layout.cooldownChipGap * config.match.sideCount);
   });
 }
 
@@ -401,17 +411,20 @@ function drawPreparationPanelText(ctx, rect, state, config) {
 
 function drawSpellSlots(ctx, rect, state, config) {
   drawSectionTitle(ctx, config.text.spellSlotsTitle, rect.x + config.layout.outerPadding, rect.y + config.layout.outerPadding, config);
-  state.sides[config.match.playerId].spellLoadout.forEach((spell, index) => {
-    const slotY = rect.y + config.layout.outerPadding + config.fonts.normalSize + config.layout.cooldownChipGap + index * (config.layout.spellSlotHeight + config.layout.spellSlotGap);
-    drawRoundedRect(ctx, rect.x + config.layout.outerPadding, slotY, rect.width - config.layout.outerPadding * config.match.sideCount, config.layout.spellSlotHeight, config.layout.cornerRadius, config.colors.buttonFill, config.colors.panelStroke, config.layout.panelLineWidth / config.match.sideCount, config);
+  drawButton(ctx, state, 'delete-spell', 'delete-spell', config.text.deleteSpellLabel, getPreparationRects(config).deleteSpellButton, null, config);
+  getPreparationSpellSlotRects(config).forEach((slot) => {
+    const spell = state.sides[config.match.playerId].spellLoadout[slot.spellIndex];
+    const selected = state.preparation.selectedSlotIndex === slot.spellIndex;
+    registerButton(state, slot.id, slot.kind, spell.name, slot.rect, null, { spellIndex: slot.spellIndex });
+    drawRoundedRect(ctx, slot.rect.x, slot.rect.y, slot.rect.width, slot.rect.height, config.layout.cornerRadius, selected ? config.colors.buttonHighlight : config.colors.buttonFill, config.colors.panelStroke, config.layout.panelLineWidth / config.match.sideCount, config);
     ctx.font = font(config.fonts.smallSize, config.fonts.boldWeight, config);
     ctx.fillStyle = config.colors.textPrimary;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(spell.name, rect.x + config.layout.outerPadding * config.match.sideCount, slotY + config.layout.cooldownChipGap);
+    ctx.fillText(spell.name, slot.rect.x + config.layout.cooldownChipGap, slot.rect.y + config.layout.cooldownChipGap);
     ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
     ctx.fillStyle = config.colors.textSecondary;
-    ctx.fillText(`${spell.type} - ${spell.status}`, rect.x + config.layout.outerPadding * config.match.sideCount, slotY + config.layout.cooldownChipGap + config.fonts.smallSize);
+    ctx.fillText(`${spell.type} - ${spell.status}`, slot.rect.x + config.layout.cooldownChipGap, slot.rect.y + config.layout.cooldownChipGap + config.fonts.smallSize);
   });
 }
 

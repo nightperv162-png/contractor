@@ -3,7 +3,7 @@ import { applyCast } from '../combat/casting.js';
 import { resetGameState } from '../core/gameState.js';
 import { showPreparation } from '../core/stateMachine.js';
 import { normalizeSpellName } from '../spells/spellFactory.js';
-import { addPatternPoint, clearDraftPattern, confirmLoadout, cycleDraftName, editDraftName, randomizeDraftPattern, saveDraftSpell, selectSpellType, randomizeSpellType, prepareAllSpells } from '../states/preparationState.js';
+import { addPatternPoint, clearDraftPattern, confirmLoadout, cycleDraftName, deletePreparedSpell, editDraftName, randomizeDraftPattern, saveDraftSpell, selectPreparedSpellSlot, selectSpellType, randomizeSpellType, prepareAllSpells } from '../states/preparationState.js';
 import { getEggGridPoints, getPreparationRects } from '../ui/layout.js';
 
 function mapPointerToCanvas(event, canvas, config) {
@@ -192,8 +192,18 @@ export function createInputController({ canvas, state, logger, random = Math.ran
       return;
     }
 
+    if (button.kind === 'delete-spell') {
+      deletePreparedSpell(state, logger, config);
+      return;
+    }
+
     if (button.kind === 'prepare-all-spells') {
       prepareAllSpells(state, logger, config);
+      return;
+    }
+
+    if (button.kind === 'preparation-spell-slot') {
+      selectPreparedSpellSlot(state, button.spellIndex, logger, config);
       return;
     }
 
