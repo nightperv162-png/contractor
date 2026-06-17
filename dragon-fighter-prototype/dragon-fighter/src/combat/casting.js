@@ -20,17 +20,17 @@ export function validateSpellCast(actor, spell, matchState, config = CONFIG) {
     return { success: false, reason: 'actor_not_found' };
   }
   if (actor.defeated) {
-    return { success: false, reason: 'actor_defeated' };
+    return { success: false, reason: config.combat.defeatedReason };
   }
 
   // Check match is in active phase
   if (matchState.phase !== config.states.active) {
-    return { success: false, reason: 'match_inactive' };
+    return { success: false, reason: config.combat.inactiveReason };
   }
 
   // Check spell exists
   if (!spell) {
-    return { success: false, reason: 'spell_not_found' };
+    return { success: false, reason: config.combat.unknownCommandReason };
   }
 
   // Check actor has enough energy
@@ -42,7 +42,7 @@ export function validateSpellCast(actor, spell, matchState, config = CONFIG) {
   // Check spell cooldown is ready (remaining cooldown <= 0)
   const spellCooldownRemaining = spell.cooldownRemaining || 0;
   if (spellCooldownRemaining > 0) {
-    return { success: false, reason: 'cooldown_active' };
+    return { success: false, reason: config.combat.cooldownReason };
   }
 
   // All checks passed
@@ -64,7 +64,7 @@ export function applyCast(actor, spell, matchState, cooldownMultiplier = 1.0, co
   // Validate first
   const validation = validateSpellCast(actor, spell, matchState, config);
   if (!validation.success) {
-    log(`Cast failed: ${actor?.id || 'unknown'} tried ${spell?.name || 'unknown'} - Reason: ${validation.reason}`, {
+    log(`Invoke failed: ${actor?.id || 'unknown'} tried ${spell?.dragonName || spell?.name || 'unknown'} - Reason: ${validation.reason}`, {
       category: 'combat'
     });
     return { success: false, reason: validation.reason };
@@ -83,10 +83,10 @@ export function applyCast(actor, spell, matchState, cooldownMultiplier = 1.0, co
   const target = getOpponent(matchState, actor.id, config);
   const effect = applySpellEffect(actor, target, spell, matchState, config);
 
-  log(`Cast success: ${actor.id} cast ${spell.name || 'spell'}`, {
+  log(`Invoke success: ${actor.id} called ${spell.dragonName || spell.name || 'dragon'}`, {
     category: 'combat',
     actor: actor.id,
-    spell: spell.name,
+    spell: spell.dragonName || spell.name,
     energyBefore,
     energyAfter: actor.energy,
     energySpent,

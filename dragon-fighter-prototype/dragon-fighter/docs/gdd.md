@@ -1,82 +1,64 @@
-# Dragon Fighter: Egg Spell Forge - GDD
+# Dragon Contractor - GDD
 
 ## Current Vision
 
-Dragon Fighter: Egg Spell Forge is a Canvas-only casual 1v1 dragon duel prototype. The player prepares five custom dragon-egg spells, then uses those prepared spells as the main combat skills.
+Dragon Contractor is a Canvas-only casual 1v1 dragon duel prototype. The player creates Dragon Contracts, then calls a dragon name during battle to invoke that dragon's power. It should feel easy to read, a little funny, and fast enough that yelling "Ignivar!" at a browser feels like a reasonable life choice.
 
-The current design direction is spell-first combat. Prepared spell names, spell buttons, and spell-slot keys are the only combat input model.
+The player is not directly casting magic. Each contract binds one dragon name to one combat power.
 
 ## Design Pillars
 
-- Voice first, not voice only: spoken spell names are the fantasy, with keyboard and Canvas fallback controls for testing.
-- Spellcraft creates identity: each spell has a pattern, type, name, energy cost, and combat effect.
-- Funny and immediate: casting should produce readable dragon feedback, effects, labels, cooldowns, and HP/energy changes.
-- Combat decisions over movement: the player wins by choosing spells well, not by steering or aiming precisely.
-- Small readable system: five prepared spells, clear HP, energy, cooldowns, feedback, and result state.
+- Voice first, not voice only: spoken dragon names are the fantasy, with keyboard and Canvas fallback controls for testing.
+- Contracts create identity: each contract has a dragon name, dragon power, energy cost, contract cooldown, and combat behavior.
+- Funny and immediate: invoking a contract should produce readable dragon feedback, effects, labels, cooldowns, and HP/energy changes.
+- Combat decisions over movement: the player wins by choosing which dragon to call, not by steering or aiming.
+- Small readable system: four prototype contracts, clear HP, integer energy, contract cooldowns, feedback, and result state.
+
+## Prototype Contracts
+
+- Ignivar: Attack behavior, 10 damage, 2-second contract cooldown.
+- Aegon: Defence behavior, 50% incoming damage for 3 seconds, 6-second contract cooldown.
+- Bront: Block behavior, prevents all incoming damage for 1 second, 5-second contract cooldown.
+- Voltaris: Skill behavior, 25 damage, 10-second contract cooldown.
 
 ## What Is Built Now
 
-- Canvas-only app shell.
-- Preparation screen with 9-dot egg pattern drawing.
+- Canvas-only app shell with the player-facing title Dragon Contractor.
+- Preparation screen with 9-dot contract sigil drawing.
 - Random valid pattern generation.
-- Spell type selection: Attack, Defense, Support, Control, Utility.
-- Spell name editing and cycling.
-- Type-specific effect preview with weight, energy cost, piercing, secondary effect, closed bonus, and instability.
-- Five spell slots with duplicate and too-similar name rejection, slot selection, and spell deletion for refilling a slot.
+- Dragon power selection: Attack, Defence, Block, Skill.
+- Dragon name editing and cycling.
+- Contract preview with weight, energy cost, piercing, secondary effect, closed bonus, and instability data.
+- Four contract slots with duplicate and too-similar dragon name rejection, slot selection, and contract deletion for refilling a slot.
 - Loadout confirmation into countdown, then active match.
-- Match screen with dragons, player panels, HP/energy display, state labels, latest feedback, spell buttons, and microphone status.
-- Combat spell buttons show each spell's energy cost and cooldown state.
-- Player spell casting through voice, keyboard slots, and Canvas spell buttons.
-- Attack, Defense, Support, Control, and Utility effects applied to the live match.
-- Cooldown countdowns, energy regeneration, hit text, shield aura, projectile effects, and result overlay.
+- Match screen with dragons, player panels, HP/integer energy display, state labels, latest called dragon, contract buttons, and microphone status.
+- Player contract invocation through voice, keyboard slots, and Canvas buttons.
+- Required contract powers applied to the live match.
+- Contract cooldown countdowns, energy regeneration, hit text, defence/block aura, projectile effects, and result overlay.
 
 ## Current Limitations
 
-- The AI is a stationary dummy for the player-combat milestone and does not cast back yet.
-- AI spell casting and tactical decision-making are planned for the next milestone.
-
-## Spell Preparation Rules
-
-Each player brings exactly five prepared spells into combat. A spell has:
-
-- Spell name in `Element Move` form, such as `Light Slash`.
-- Element identity from the first word of the spell name.
-- Spell type: Attack, Defense, Support, Control, Utility.
-- 9-dot pattern.
-- Weight band.
-- Energy cost.
-- Effect preview.
-- Cooldown data for the future combat phase.
-
-Pattern complexity influences spell weight, energy cost, piercing, secondary effects, closed-pattern bonuses, and future misfire risk. Exact formulas and thresholds live in `tdd.md`.
-
-## Spell Type Effects
-
-- Attack: damage by weight, with closed-pattern bonus damage.
-- Defense: shield value by weight, with closed-pattern bonus shield.
-- Support: healing by weight, with closed-pattern bonus healing.
-- Control: slow duration by weight, with closed-pattern bonus duration.
-- Utility: energy-regen utility duration by weight, with closed-pattern bonus duration.
+- The AI remains a stationary dummy during the current player-combat milestone.
+- Full AI contract selection is planned for the next milestone.
 
 ## Target Combat Rules
 
-- Combat should be controlled by prepared spells only.
-- Voice casting uses full prepared spell names.
-- Button casting uses the Canvas spell buttons.
-- Spells require enough energy, must be off cooldown, and only work during active match state.
-- Voice casts use normal spell cooldown.
-- Button casts use longer cooldown.
-- Failed voice recognition costs no energy and applies retry delay.
-- Damage priority is spell shield with piercing, then HP.
+- Combat is controlled by Dragon Contracts only.
+- Voice input uses full dragon names.
+- Button and keyboard input invoke contract slots.
+- Contracts require enough energy, must be off contract cooldown, and only work during active match state.
+- Failed recognition costs no energy and applies retry delay.
+- Failure feedback should say Unknown Dragon, Contract Cooldown, Defeated, or Match Inactive where relevant.
+- Damage priority is Block, then Defence, then shield/pierce fallback behavior, then HP.
 - Exact combat values, formulas, config keys, and implementation rules live in `tdd.md`.
 
 ## Target Match Flow
 
-1. Player creates or randomizes five spells.
-2. Player confirms the loadout.
+1. Player creates or edits Dragon Contracts.
+2. Player confirms the contract loadout.
 3. Match starts after countdown.
-4. Player and AI cast prepared spells.
-5. HP, energy, cooldowns, effects, labels, and feedback update.
+4. Player calls dragon names to invoke powers.
+5. HP, energy, contract cooldowns, effects, labels, and feedback update.
 6. Match ends when a side reaches 0 HP or time expires.
 7. Result shows Win, Lose, or Draw.
 

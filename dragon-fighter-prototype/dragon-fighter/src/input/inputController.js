@@ -42,6 +42,14 @@ function truncateTranscript(text, config = CONFIG) {
   return `${value.slice(config.match.minHp, config.input.maxTranscriptCharacters)}...`;
 }
 
+function getContractName(contract) {
+  return contract?.dragonName ?? contract?.name ?? '';
+}
+
+function normalizedContractName(name) {
+  return normalizeSpellName(name).toLowerCase();
+}
+
 export function createInputController({ canvas, state, logger, random = Math.random, config = CONFIG, windowRef = window }) {
   const SpeechRecognition = getSpeechRecognitionConstructor(windowRef);
   let recognizer = null;
@@ -51,14 +59,15 @@ export function createInputController({ canvas, state, logger, random = Math.ran
     const spell = actor.spellLoadout[slotIndex] ?? null;
     const cooldownMultiplier = source === 'voice' ? config.spellCasting.voiceCooldownMultiplier : config.spellCasting.buttonCooldownMultiplier;
     const result = applyCast(actor, spell, state, cooldownMultiplier, config);
-    actor.latestCommand = result.success ? result.feedbackMessage : result.reason;
+    const contractName = getContractName(spell);
+    actor.latestCommand = result.success ? contractName : result.reason;
     actor.latestReason = result.success ? config.combat.successReason : result.reason;
-    actor.actionLabel = result.success ? spell.name : result.reason;
+    actor.actionLabel = result.success ? contractName : result.reason;
     actor.actionLabelSeconds = config.combat.failedFeedbackSeconds;
     actor.failedLabelSeconds = result.success ? config.match.minHp : config.combat.failedFeedbackSeconds;
     actor.latestFeedback = result.success ? result.feedbackMessage : result.reason;
     actor.latestFeedbackTime = config.animation.hitTextSeconds;
-    logger?.info('Spell input received', { source, slotIndex, spell: spell?.name, result });
+    logger?.info('Contract input received', { source, slotIndex, dragonName: contractName, result });
     return result;
   }
 
@@ -69,7 +78,7 @@ export function createInputController({ canvas, state, logger, random = Math.ran
       actor.latestReason = config.combat.voiceLockoutReason;
       actor.actionLabel = actor.latestReason;
       actor.failedLabelSeconds = config.combat.failedFeedbackSeconds;
-      logger?.warn('Voice spell blocked by global lockout', { transcript, remaining: state.voiceLockoutRemaining });
+      logger?.warn('Voice contract blocked by global lockout', { transcript, remaining: state.voiceLockoutRemaining });
       return { success: false, reason: config.combat.voiceLockoutReason };
     }
     if (state.voiceRetryRemaining > config.match.minHp) {
@@ -77,19 +86,19 @@ export function createInputController({ canvas, state, logger, random = Math.ran
       actor.latestReason = config.combat.voiceRetryReason;
       actor.actionLabel = actor.latestReason;
       actor.failedLabelSeconds = config.combat.failedFeedbackSeconds;
-      logger?.warn('Voice spell blocked by retry delay', { transcript, remaining: state.voiceRetryRemaining });
+      logger?.warn('Voice contract blocked by retry delay', { transcript, remaining: state.voiceRetryRemaining });
       return { success: false, reason: config.combat.voiceRetryReason };
     }
 
-    const heardName = normalizeSpellName(transcript).toLowerCase();
-    const slotIndex = actor.spellLoadout.findIndex((spell) => normalizeSpellName(spell.name).toLowerCase() === heardName);
+    const heardName = normalizedContractName(transcript);
+    const slotIndex = actor.spellLoadout.findIndex((spell) => normalizedContractName(getContractName(spell)) === heardName);
     if (slotIndex < config.match.minHp) {
       actor.latestCommand = config.combat.unknownCommandReason;
       actor.latestReason = config.combat.unknownCommandReason;
       actor.actionLabel = config.combat.unknownCommandReason;
       actor.failedLabelSeconds = config.combat.failedFeedbackSeconds;
       state.voiceRetryRemaining = config.spellCasting.voiceRetryDelaySeconds;
-      logger?.warn('Voice spell not found', { transcript });
+      logger?.warn('Voice dragon not found', { transcript });
       return { success: false, reason: config.combat.unknownCommandReason };
     }
     const result = submitSpell(slotIndex, 'voice');

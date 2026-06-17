@@ -21,7 +21,8 @@ function generatedSpellName(element, spellType, config) {
 
 function isGeneratedSpellName(name, config) {
   const [element, move] = normalizeSpellName(name).split(' ');
-  return config.spells.elements.includes(element) && moveNames(config).includes(move);
+  const contractNames = config.dragonContracts.definitions.map((contract) => contract.dragonName);
+  return contractNames.includes(normalizeSpellName(name)) || (config.spells.elements.includes(element) && moveNames(config).includes(move));
 }
 
 export function refreshPreparationPreview(state, logger, config = CONFIG) {
@@ -55,21 +56,21 @@ export function randomizeDraftPattern(state, random, logger, config = CONFIG) {
 
 export function selectSpellType(state, spellType, logger, config = CONFIG) {
   if (!config.spells.types.includes(spellType)) return false;
+  const contractNames = config.dragonContracts.definitions.map((contract) => contract.dragonName);
   const shouldSyncName = isGeneratedSpellName(state.preparation.draftSpellName, config);
   const element = elementFromName(state.preparation.draftSpellName, config);
   state.preparation.selectedSpellType = spellType;
-  if (shouldSyncName) state.preparation.draftSpellName = generatedSpellName(element, spellType, config);
-  logger?.info('Spell type selected', { spellType });
+  if (shouldSyncName && !contractNames.includes(state.preparation.draftSpellName)) state.preparation.draftSpellName = generatedSpellName(element, spellType, config);
+  logger?.info('Dragon power selected', { spellType });
   refreshPreparationPreview(state, logger, config);
   return true;
 }
 
 export function cycleDraftName(state, logger, config = CONFIG) {
-  state.preparation.nameCycleIndex = (state.preparation.nameCycleIndex + config.patterns.firstPointId) % config.spells.nameCycle.length;
-  const element = config.spells.nameCycle[state.preparation.nameCycleIndex];
-  state.preparation.draftSpellName = generatedSpellName(element, state.preparation.selectedSpellType, config);
+  state.preparation.nameCycleIndex = (state.preparation.nameCycleIndex + config.patterns.firstPointId) % config.dragonContracts.definitions.length;
+  state.preparation.draftSpellName = config.dragonContracts.definitions[state.preparation.nameCycleIndex].dragonName;
   state.preparation.feedback = config.text.prepReadyFeedback;
-  logger?.info('Spell name cycled', { name: state.preparation.draftSpellName });
+  logger?.info('Dragon name cycled', { name: state.preparation.draftSpellName });
   return state.preparation.draftSpellName;
 }
 
@@ -100,14 +101,14 @@ export function saveDraftSpell(state, logger, config = CONFIG) {
   const analysis = refreshPreparationPreview(state, logger, config);
   if (analysis.connectionCount < config.patterns.lightMinConnections) {
     state.preparation.feedback = config.text.patternRejectedFeedback;
-    logger?.warn('Spell rejected', { reason: state.preparation.feedback });
+    logger?.warn('Contract rejected', { reason: state.preparation.feedback });
     return { ok: false, reason: state.preparation.feedback };
   }
 
   const validation = validateSpellName(state.preparation.draftSpellName, state.sides[config.match.playerId].spellLoadout, config);
   if (!validation.ok) {
     state.preparation.feedback = validation.reason;
-    logger?.warn('Spell rejected', { reason: validation.reason });
+    logger?.warn('Contract rejected', { reason: validation.reason });
     return validation;
   }
 
@@ -125,8 +126,8 @@ export function saveDraftSpell(state, logger, config = CONFIG) {
   spell.filled = true;
   state.sides[config.match.playerId].spellLoadout[slotIndex] = spell;
   state.preparation.selectedSlotIndex = Math.min(slotIndex + config.patterns.firstPointId, config.spells.perLoadout - config.patterns.firstPointId);
-  state.preparation.feedback = `${config.text.spellSavedFeedback} ${spell.name}`;
-  logger?.info('Spell saved', { slotIndex, spell });
+  state.preparation.feedback = `${config.text.spellSavedFeedback} ${spell.dragonName}`;
+  logger?.info('Contract created', { slotIndex, spell });
   return { ok: true, reason: config.combat.successReason, spell, slotIndex };
 }
 
@@ -135,7 +136,7 @@ export function selectPreparedSpellSlot(state, slotIndex, logger, config = CONFI
   state.preparation.selectedSlotIndex = slotIndex;
   const spell = state.sides[config.match.playerId].spellLoadout[slotIndex];
   state.preparation.feedback = spell.filled ? `${config.text.spellSelectedFeedback} ${spell.name}` : config.text.prepReadyFeedback;
-  logger?.info('Prepared spell slot selected', { slotIndex, spell: spell.name, filled: spell.filled });
+  logger?.info('Prepared contract slot selected', { slotIndex, dragonName: spell.dragonName ?? spell.name, filled: spell.filled });
   return true;
 }
 
@@ -145,14 +146,14 @@ export function deletePreparedSpell(state, logger, config = CONFIG) {
   const spell = state.sides[config.match.playerId].spellLoadout[slotIndex];
   if (!spell?.filled) {
     state.preparation.feedback = config.text.loadoutBlockedFeedback;
-    logger?.warn('Prepared spell delete blocked', { slotIndex, reason: state.preparation.feedback });
+    logger?.warn('Prepared contract delete blocked', { slotIndex, reason: state.preparation.feedback });
     return { ok: false, reason: state.preparation.feedback };
   }
 
   state.sides[config.match.playerId].spellLoadout[slotIndex] = createEmptySpellSlot(slotIndex, config);
   state.preparation.loadoutConfirmed = false;
   state.preparation.feedback = config.text.spellDeletedFeedback;
-  logger?.info('Prepared spell deleted', { slotIndex, deletedSpell: spell.name });
+  logger?.info('Prepared contract voided', { slotIndex, deletedDragon: spell.dragonName ?? spell.name });
   return { ok: true, reason: config.combat.successReason, slotIndex };
 }
 
@@ -165,7 +166,7 @@ export function confirmLoadout(state, logger, config = CONFIG) {
   }
 
   state.preparation.loadoutConfirmed = true;
-  logger?.info('Loadout confirmed');
+  logger?.info('Contract loadout confirmed');
   startMatchCountdown(state, logger, config);
   return validation;
 }
@@ -216,13 +217,13 @@ export function prepareAllSpells(state, logger, config = CONFIG) {
     const result = saveDraftSpell(state, logger, config);
     if (result.ok) {
       savedCount++;
-      logger?.info(`Auto-spell ${i + 1}/${config.spells.perLoadout} saved`, result.spell);
+      logger?.info(`Auto-contract ${i + 1}/${config.spells.perLoadout} saved`, result.spell);
     } else {
-      logger?.warn(`Auto-spell ${i + 1} failed`, { reason: result.reason });
+      logger?.warn(`Auto-contract ${i + 1} failed`, { reason: result.reason });
     }
   }
 
-  state.preparation.feedback = `All 5 spells prepared and ready!`;
-  logger?.info('Prepare all spells complete', { savedCount });
+  state.preparation.feedback = `All dragon contracts are ready!`;
+  logger?.info('Prepare all contracts complete', { savedCount });
   return { ok: savedCount === config.spells.perLoadout, count: savedCount };
 }

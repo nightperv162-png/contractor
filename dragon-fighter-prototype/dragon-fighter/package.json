@@ -1,7 +1,7 @@
 {
-  "name": "dragon-fighter-prototype",
+  "name": "dragon-contractor-prototype",
   "version": "1.0.0",
-  "description": "Canvas-only Dragon Fighter voice-command prototype.",
+  "description": "Canvas-only Dragon Contractor voice-call prototype.",
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev-server.js",

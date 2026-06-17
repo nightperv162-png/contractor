@@ -1,11 +1,11 @@
-// Dragon Fighter centralized configuration.
+// Dragon Contractor centralized configuration.
 // All gameplay, timing, layout, visual, input, AI, logging, and diagnostic tunables live here.
 // Non-coders should be able to adjust this file for playtesting without editing source logic.
 
 export const CONFIG = {
   meta: {
     // Human-readable prototype title shown in logs and the browser title. Recommended: short text under 40 characters.
-    title: 'Dragon Fighter Prototype',
+    title: 'Dragon Contractor',
     // Current prototype version shown in diagnostics. Recommended: semantic version-like text.
     version: '1.0.0'
   },
@@ -23,7 +23,7 @@ export const CONFIG = {
     // Enables important gameplay logs for debugging input, combat, AI, and match state. Recommended: true during prototype development, false for demos.
     enabled: true,
     // Prefix added to every log message so game logs are easy to find in the browser console. Recommended: short text.
-    prefix: '[Dragon Fighter]',
+    prefix: '[Dragon Contractor]',
     // Enables more frequent frame/state logs. Recommended: false unless debugging timing problems.
     verboseFrames: false
   },
@@ -166,22 +166,22 @@ export const CONFIG = {
   },
 
   combat: {
-    // Short duration for failed command labels such as Cooldown or Unknown Command, in seconds. Recommended range: 0.4â€“1.2.
+    // Short duration for failed contract labels such as Contract Cooldown or Unknown Dragon, in seconds. Recommended range: 0.4-1.2.
     failedFeedbackSeconds: 0.8,
     // State label shown when a dragon is doing nothing. Recommended: Idle.
     idleLabel: 'Idle',
     // State label shown when an action is on cooldown and a player tried to use it. Recommended: Cooldown.
-    cooldownLabel: 'Cooldown',
+    cooldownLabel: 'Contract Cooldown',
     // Cooldown chip label shown when a spell can be cast. Recommended: Ready.
     cooldownReadyLabel: 'Ready',
     // Number of decimal places shown for cooldown countdowns. Recommended range: 0-1.
     cooldownDecimalPlaces: 1,
     // State label shown after HP reaches zero. Recommended: Defeated.
     defeatedLabel: 'Defeated',
-    // Failure reason shown for commands that are not a valid full word. Recommended: Unknown Command.
-    unknownCommandReason: 'Unknown Command',
+    // Failure reason shown for calls that do not match a valid dragon name. Recommended: Unknown Dragon.
+    unknownCommandReason: 'Unknown Dragon',
     // Failure reason shown when an action is still cooling down. Recommended: Cooldown.
-    cooldownReason: 'Cooldown',
+    cooldownReason: 'Contract Cooldown',
     // Failure reason shown when the actor is already defeated. Recommended: Defeated.
     defeatedReason: 'Defeated',
     // Failure reason shown when commands are attempted outside active match. Recommended: Match Inactive.
@@ -203,9 +203,21 @@ export const CONFIG = {
     waitingLabel: 'Waiting'
   },
 
+  dragonContracts: {
+    // Number of bound dragon contracts each side brings into combat. Recommended: exactly 4 for this prototype roster.
+    perLoadout: 4,
+    // Fixed prototype roster; each contract binds one dragon name to one power behavior.
+    definitions: [
+      { id: 'ignivar', dragonName: 'Ignivar', powerType: 'Attack', powerName: 'Flame Slash', damage: 10, durationSeconds: 0, damageMultiplier: 1, cooldownSeconds: 2, energyCost: 0 },
+      { id: 'aegon', dragonName: 'Aegon', powerType: 'Defence', powerName: 'Halfguard Pact', damage: 0, durationSeconds: 3, damageMultiplier: 0.5, cooldownSeconds: 6, energyCost: 0 },
+      { id: 'bront', dragonName: 'Bront', powerType: 'Block', powerName: 'Stone Block', damage: 0, durationSeconds: 1, damageMultiplier: 0, cooldownSeconds: 5, energyCost: 0 },
+      { id: 'voltaris', dragonName: 'Voltaris', powerType: 'Skill', powerName: 'Storm Crash', damage: 25, durationSeconds: 0, damageMultiplier: 1, cooldownSeconds: 10, energyCost: 0 }
+    ]
+  },
+
   spells: {
-    // Number of prepared egg spells each side brings into combat. Recommended: exactly 5 for this prototype.
-    perLoadout: 5,
+    // Number of prepared contract slots each side brings into combat. Recommended: match dragonContracts.perLoadout.
+    perLoadout: 4,
     // Element names used as the first word in generated spell names. Recommended: short readable words.
     elements: ['Light', 'Fire', 'Water', 'Earth', 'Wind', 'Dark', 'Stone', 'Ice'],
     // Spell family names derived from elements for placeholder identity. Recommended: match the first five elements.
@@ -213,17 +225,16 @@ export const CONFIG = {
     // Move words used as the second word in generated spell names by spell type. Recommended: distinct action nouns.
     moveNamesByType: {
       Attack: 'Slash',
-      Defense: 'Guard',
-      Support: 'Heal',
-      Control: 'Snare',
-      Utility: 'Dash'
+      Defence: 'Guard',
+      Block: 'Block',
+      Skill: 'Crash'
     },
-    // Default player spell names shown in the static Milestone 1 shell. Recommended: unique two-word names.
-    defaultPlayerNames: ['Light Slash', 'Fire Guard', 'Water Heal', 'Earth Snare', 'Wind Dash'],
-    // Default AI spell names shown in the static Milestone 1 shell. Recommended: unique two-word names.
-    defaultAiNames: ['Dark Slash', 'Stone Guard', 'Ice Heal', 'Light Snare', 'Fire Dash'],
-    // Spell type labels used in the forge selector and spell buttons. Recommended: the five GDD types.
-    types: ['Attack', 'Defense', 'Support', 'Control', 'Utility'],
+    // Default player dragon names shown before custom contracts are created. Recommended: match the prototype roster.
+    defaultPlayerNames: ['Ignivar', 'Aegon', 'Bront', 'Voltaris'],
+    // Default AI dragon names shown before custom contracts are created. Recommended: match the prototype roster.
+    defaultAiNames: ['Ignivar', 'Aegon', 'Bront', 'Voltaris'],
+    // Dragon power labels used in the contract selector. Recommended: the four prototype power types.
+    types: ['Attack', 'Defence', 'Block', 'Skill'],
     // Minimum accepted spell name length before saving a spell. Recommended range: 3-12 characters.
     minimumNameLength: 3,
     // Similarity ratio where two names are considered too close. Recommended range: 0.65-0.9.
@@ -338,11 +349,11 @@ export const CONFIG = {
   },
 
   spellCasting: {
-    // Base cooldown duration applied to newly prepared spells before input multipliers. Recommended range: 1.5-4.
+    // Base cooldown duration applied to custom contracts before input multipliers. Recommended range: 1.5-4.
     baseCooldownSeconds: 2,
-    // Cooldown multiplier for voice-cast spells. Recommended: 1.0 (same as base).
+    // Cooldown multiplier for voice-invoked contracts. Recommended: 1.0 (same as base).
     voiceCooldownMultiplier: 1.0,
-    // Cooldown multiplier for button/keyboard-cast spells. Recommended: 1.5 (longer to encourage voice).
+    // Cooldown multiplier for button/keyboard-invoked contracts. Recommended: 1.5 (longer to encourage voice).
     buttonCooldownMultiplier: 1.5,
     // Cooldown multiplier applied while a caster is slowed. Recommended range: 1.25-2.0.
     slowCooldownMultiplier: 1.5,
@@ -368,14 +379,14 @@ export const CONFIG = {
   input: {
     // Enables browser speech recognition when supported. Recommended: true for voice prototype testing.
     voiceEnabled: true,
-    // Speech recognition language. Recommended: en-US for the current spell names.
+    // Speech recognition language. Recommended: en-US for the current dragon names.
     speechLanguage: 'en-US',
     // Text shown when voice recognition is unavailable in the current browser. Recommended: short message.
     voiceUnavailableText: 'Voice unavailable: use keys or Canvas buttons',
     // Text shown while the mic is listening. Recommended: short message.
-    voiceListeningText: 'Listening... say a prepared spell name',
+    voiceListeningText: 'Listening... call a dragon name',
     // Text shown before voice listening starts. Recommended: short message.
-    voiceReadyText: 'Tap Voice to speak a spell name',
+    voiceReadyText: 'Tap Voice to call a dragon',
     // Canvas voice button label. Recommended: Voice.
     voiceButtonLabel: 'Voice',
     // Restart key for desktop. Recommended: r.
@@ -603,54 +614,54 @@ export const CONFIG = {
     playerElement: 'ðŸ”¥',
     // Player 2 dragon element shown in the HUD. Recommended: one emoji or short word.
     aiElement: 'ðŸŒŠ',
-    // Command reference heading. Recommended: short text.
-    commandReferenceTitle: 'Prepared spell controls',
+    // Contract call reference heading. Recommended: short text.
+    commandReferenceTitle: 'Dragon contract calls',
     // Preparation screen heading. Recommended: short text.
-    preparationTitle: 'Egg Spell Forge',
+    preparationTitle: 'Dragon Contractor',
     // Preparation screen subtitle. Recommended: short text.
-    preparationSubtitle: 'Static forge layout preview',
+    preparationSubtitle: 'Make dragon contracts, then call dragon names in battle.',
     // Egg drawing panel heading. Recommended: short text.
-    eggDrawingTitle: '9-Dot Egg Pattern',
+    eggDrawingTitle: '9-Dot Contract Sigil',
     // Spell type selector heading. Recommended: short text.
-    spellTypeTitle: 'Spell Type',
+    spellTypeTitle: 'Dragon Power',
     // Spell name field heading. Recommended: short text.
-    spellNameTitle: 'Spell Name',
+    spellNameTitle: 'Dragon Name',
     // Effect preview heading. Recommended: short text.
-    effectPreviewTitle: 'Effect Preview',
+    effectPreviewTitle: 'Contract Preview',
     // Spell slot panel heading. Recommended: short text.
-    spellSlotsTitle: 'Five Prepared Spells',
+    spellSlotsTitle: 'Dragon Contracts',
     // Random pattern button label. Recommended: short command text.
     randomPatternLabel: 'Random Pattern',
     // Confirm loadout button label. Recommended: short command text.
     confirmLoadoutLabel: 'Start Match',
     // Save spell button label. Recommended: short command text.
-    saveSpellLabel: 'Save Spell',
+    saveSpellLabel: 'Create Contract',
     // Delete selected spell button label. Recommended: short command text.
-    deleteSpellLabel: 'Delete',
+    deleteSpellLabel: 'Void',
     // Cycle spell name button label. Recommended: short command text.
-    cycleNameLabel: 'Cycle Name',
+    cycleNameLabel: 'Cycle Dragon',
     // Clear pattern button label. Recommended: short command text.
     clearPatternLabel: 'Clear Pattern',
     // Preparation feedback shown before any save attempt. Recommended: short sentence.
-    prepReadyFeedback: 'Draw a pattern, choose a type, name it, then save five spells.',
+    prepReadyFeedback: 'Draw a sigil, choose a power, name the dragon, then create the contract.',
     // Feedback shown after a spell is saved. Recommended: short sentence.
-    spellSavedFeedback: 'Spell saved.',
+    spellSavedFeedback: 'Contract created.',
     // Feedback shown when a spell name is duplicate or too similar. Recommended: short sentence.
-    spellNameRejectedFeedback: 'Use a unique, less similar spell name.',
+    spellNameRejectedFeedback: 'Use a unique dragon name.',
     // Feedback shown when the pattern has too few connections. Recommended: short sentence.
     patternRejectedFeedback: 'Connect at least one line before saving.',
     // Feedback shown when all five slots are ready. Recommended: short sentence.
-    loadoutReadyFeedback: 'Five-spell loadout ready.',
-    // Feedback shown after a prepared spell slot is selected. Recommended: short sentence.
-    spellSelectedFeedback: 'Spell slot selected.',
-    // Feedback shown after a prepared spell is deleted. Recommended: short sentence.
-    spellDeletedFeedback: 'Spell deleted. Save a new spell to refill the slot.',
+    loadoutReadyFeedback: 'Dragon contracts ready.',
+    // Feedback shown after a prepared contract slot is selected. Recommended: short sentence.
+    spellSelectedFeedback: 'Contract selected.',
+    // Feedback shown after a prepared contract is voided. Recommended: short sentence.
+    spellDeletedFeedback: 'Contract voided. Create a new one to refill the slot.',
     // Feedback shown when loadout confirmation is blocked. Recommended: short sentence.
-    loadoutBlockedFeedback: 'Fill all five spell slots first.',
+    loadoutBlockedFeedback: 'Create every dragon contract first.',
     // Match preview back button label. Recommended: short command text.
-    backToForgeLabel: 'Back To Forge',
+    backToForgeLabel: 'Back To Contracts',
     // Match preview heading for the optional layout-only state. Recommended: short text.
-    matchPreviewTitle: 'Match Layout',
+    matchPreviewTitle: 'Contract Match Layout',
     // Energy label text used in HUD panels. Recommended: short text.
     energyLabel: 'Energy',
     // Short energy label used inside compact spell buttons. Recommended: 1-3 letters.
@@ -658,15 +669,15 @@ export const CONFIG = {
     // Microphone status label used in match HUD. Recommended: short text.
     microphoneStateLabel: 'Mic',
     // Latest player command heading. Recommended: short text.
-    latestPlayerTitle: 'P1 Heard',
+    latestPlayerTitle: 'Called Dragon',
     // Latest AI command heading. Recommended: short text.
-    latestAiTitle: 'AI Action',
+    latestAiTitle: 'AI Contract',
     // Initial player command text before any input. Recommended: short text.
-    noPlayerCommand: 'None yet',
+    noPlayerCommand: 'No dragon called',
     // Initial AI command text before any AI action. Recommended: short text.
     noAiCommand: 'Waiting',
     // Microcopy shown above fallback controls. Recommended: short text.
-    fallbackHint: 'Keys: 1-5 cast spells / V Voice',
+    fallbackHint: 'Keys: 1-4 invoke contracts / V Voice',
     // Private asset warning shown in the lower-left corner. Recommended: short reminder.
     assetWarning: 'Private prototype: replace any unlicensed dragon assets before sharing publicly.'
   }

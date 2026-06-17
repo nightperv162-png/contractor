@@ -49,9 +49,13 @@ export function validateSpellName(name, existingSpells, config = CONFIG) {
 
 export function createEmptySpellSlot(index, config = CONFIG) {
   return {
-    id: `empty-spell-${index + config.patterns.firstPointId}`,
-    name: `Slot ${index + config.patterns.firstPointId}`,
+    id: `empty-contract-${index + config.patterns.firstPointId}`,
+    contractId: null,
+    dragonName: `Contract Slot ${index + config.patterns.firstPointId}`,
+    name: `Contract Slot ${index + config.patterns.firstPointId}`,
     family: config.spells.defaultFamilies[index],
+    powerType: config.spells.types[index],
+    powerName: config.spells.moveNamesByType[config.spells.types[index]] ?? config.spells.types[index],
     type: config.spells.types[index],
     status: config.spells.placeholderStatus,
     cooldownRemaining: config.match.minHp,

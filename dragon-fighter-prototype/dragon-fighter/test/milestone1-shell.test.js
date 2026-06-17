@@ -5,16 +5,18 @@ import { createInitialGameState } from '../src/core/gameState.js';
 import { showMatchPreview, showPreparation, startMatchCountdown, transitionTo } from '../src/core/stateMachine.js';
 import { getPreparationRects, getPreparationSpellSlotRects, getSpellButtonRects } from '../src/ui/layout.js';
 
-test('Milestone 1 config exposes preparation, match preview, and five spell placeholders', () => {
+test('Milestone 1 config exposes Dragon Contractor states and prototype contracts', () => {
+  assert.equal(CONFIG.meta.title, 'Dragon Contractor');
   assert.equal(CONFIG.states.preparation, 'preparation');
   assert.equal(CONFIG.states.matchPreview, 'match-preview');
-  assert.equal(CONFIG.spells.perLoadout, 5);
-  assert.deepEqual(CONFIG.spells.types, ['Attack', 'Defense', 'Support', 'Control', 'Utility']);
+  assert.equal(CONFIG.spells.perLoadout, 4);
+  assert.deepEqual(CONFIG.spells.types, ['Attack', 'Defence', 'Block', 'Skill']);
+  assert.deepEqual(CONFIG.dragonContracts.definitions.map((contract) => contract.dragonName), ['Ignivar', 'Aegon', 'Bront', 'Voltaris']);
   assert.equal(CONFIG.match.startingEnergy, 20);
   assert.equal(CONFIG.match.maxEnergy, 30);
 });
 
-test('initial game state starts in preparation with five player and AI spell slots', () => {
+test('initial game state starts in preparation with player and AI contract slots', () => {
   const state = createInitialGameState(CONFIG);
   assert.equal(state.phase, CONFIG.states.preparation);
   assert.equal(state.preparation.selectedSpellType, CONFIG.spells.types[CONFIG.match.minHp]);
@@ -22,6 +24,7 @@ test('initial game state starts in preparation with five player and AI spell slo
   assert.equal(state.sides[CONFIG.match.aiId].energy, CONFIG.match.startingEnergy);
   assert.equal(state.sides[CONFIG.match.playerId].spellLoadout.length, CONFIG.spells.perLoadout);
   assert.equal(state.sides[CONFIG.match.aiId].spellLoadout.length, CONFIG.spells.perLoadout);
+  assert.equal(state.sides[CONFIG.match.playerId].spellLoadout[CONFIG.match.minHp].dragonName, 'Ignivar');
 });
 
 test('state machine switches between preparation and static match preview', () => {
