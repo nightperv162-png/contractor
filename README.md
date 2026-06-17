@@ -1,2 +1,3 @@
-# VibeCode
-just doing something 
+# contractor
+
+Dragon Contractor prototype workspace.
