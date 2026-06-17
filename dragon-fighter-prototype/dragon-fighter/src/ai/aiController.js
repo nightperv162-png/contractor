@@ -26,18 +26,17 @@ export function updateAi(state, deltaSeconds, random, logger, config = CONFIG) {
   const spellIndex = chooseAiSpellIndex(state, random, config);
   if (spellIndex === null) {
     ai.latestCommand = config.ai.waitingLabel;
-    logger?.info('AI skipped contract because no contract was available');
+    logger?.info('AI skipped spell because no spell was available');
     return null;
   }
 
   const spell = ai.spellLoadout[spellIndex];
   const result = applyCast(ai, spell, state, config.spellCasting.buttonCooldownMultiplier, config);
-  const dragonName = spell.dragonName ?? spell.name;
-  ai.latestCommand = dragonName;
+  ai.latestCommand = spell.name;
   ai.latestReason = result.success ? config.combat.successReason : result.reason;
-  ai.actionLabel = result.success ? dragonName : result.reason;
+  ai.actionLabel = result.success ? spell.name : result.reason;
   ai.actionLabelSeconds = config.combat.failedFeedbackSeconds;
   ai.failedLabelSeconds = result.success ? config.match.minHp : config.combat.failedFeedbackSeconds;
-  logger?.info('AI selected contract', { spellIndex, dragonName, result });
+  logger?.info('AI selected spell', { spellIndex, spell: spell.name, result });
   return result;
 }

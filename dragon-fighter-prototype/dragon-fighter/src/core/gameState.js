@@ -3,39 +3,8 @@ import { analyzePattern } from '../spells/patternAnalyzer.js';
 import { createEmptySpellSlot } from '../spells/spellLoadout.js';
 import { getSpellEffectPreview } from '../spells/spellRules.js';
 
-function createContractFromDefinition(contract, index, config) {
-  return {
-    id: `contract-${contract.id}`,
-    contractId: contract.id,
-    dragonName: contract.dragonName,
-    name: contract.dragonName,
-    family: contract.dragonName,
-    powerType: contract.powerType,
-    powerName: contract.powerName,
-    type: contract.powerType,
-    damage: contract.damage,
-    durationSeconds: contract.durationSeconds,
-    damageMultiplier: contract.damageMultiplier,
-    energyCost: contract.energyCost,
-    baseCooldown: contract.cooldownSeconds,
-    cooldownRemaining: config.match.minHp,
-    status: `${contract.powerName} / ${contract.energyCost} ${config.text.energyShortLabel}`,
-    filled: true,
-    patternPoints: [],
-    pattern: { piercePercent: config.match.minHp, hasClosedBonus: false },
-    weightBand: config.patterns.unformedLabel,
-    slotIndex: index
-  };
-}
-
 function createSpellLoadout(names, config) {
-  if (config.dragonContracts?.definitions?.length) {
-    return config.dragonContracts.definitions
-      .slice(config.match.minHp, config.dragonContracts.perLoadout)
-      .map((contract, index) => createContractFromDefinition(contract, index, config));
-  }
-
-  return names.slice(config.match.minHp, config.spells.perLoadout).map((name, index) => {
+  return names.map((name, index) => {
     const spell = createEmptySpellSlot(index, config);
     spell.cooldownRemaining = config.match.minHp;
     spell.baseCooldown = config.spellCasting.baseCooldownSeconds;
@@ -61,9 +30,6 @@ function createSide(id, name, element, spellNames, config) {
     // Spell combat properties
     shield: 0,
     shieldExpiryTime: 0,
-    defenceActive: 0,
-    defenceDamageMultiplier: config.shieldAndDamage.fullDamageMultiplier,
-    blockActive: 0,
     slowActive: 0,
     utilityBonusActive: 0,
     latestFeedback: '',
@@ -94,7 +60,7 @@ export function createInitialGameState(config = CONFIG) {
     voiceLockoutRemaining: config.match.minHp,
     preparation: {
       selectedSpellType: config.spells.types[config.match.minHp],
-      draftSpellName: config.dragonContracts.definitions[config.match.minHp].dragonName,
+      draftSpellName: config.spells.defaultPlayerNames[config.match.minHp],
       draftPatternPoints: initialPattern,
       draftAnalysis: initialAnalysis,
       effectPreview: getSpellEffectPreview(config.spells.types[config.match.minHp], initialAnalysis, config),
@@ -195,17 +161,6 @@ export function updateActorEffects(actor, deltaSeconds, config = CONFIG) {
   // Update slow effect
   if (actor.slowActive && typeof actor.slowActive === 'number') {
     actor.slowActive = Math.max(0, actor.slowActive - deltaSeconds);
-  }
-
-  if (actor.defenceActive && typeof actor.defenceActive === 'number') {
-    actor.defenceActive = Math.max(0, actor.defenceActive - deltaSeconds);
-    if (actor.defenceActive <= config.match.minHp) {
-      actor.defenceDamageMultiplier = config.shieldAndDamage.fullDamageMultiplier;
-    }
-  }
-
-  if (actor.blockActive && typeof actor.blockActive === 'number') {
-    actor.blockActive = Math.max(0, actor.blockActive - deltaSeconds);
   }
 
   // Update utility bonus regen

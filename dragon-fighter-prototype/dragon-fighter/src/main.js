@@ -40,8 +40,8 @@ function boot() {
   const loop = createGameLoop({ state, canvas, context, random, logger, config: CONFIG });
   loop.start();
 
-  window.dragonContractorDebug = { state, input, loop, config: CONFIG };
-  logger.info('Dragon Contractor booted', { version: CONFIG.meta.version });
+  window.dragonFighterDebug = { state, input, loop, config: CONFIG };
+  logger.info('Dragon Fighter booted', { version: CONFIG.meta.version });
 }
 
 boot();

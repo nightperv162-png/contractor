@@ -24,15 +24,6 @@ export function getSpellEffectPreview(spellType, analysis, config = CONFIG) {
   if (spellType === 'Attack') {
     const damage = addClosedBonus(config.spellEffects.attackDamageByWeight[weight], spellType, analysis, config);
     effect = `Deals ${damage} damage`;
-  } else if (spellType === 'Defence') {
-    const contract = config.dragonContracts.definitions.find((item) => item.powerType === 'Defence');
-    effect = `Incoming damage ${Math.round(contract.damageMultiplier * config.patterns.percentMultiplier)}% for ${contract.durationSeconds}s`;
-  } else if (spellType === 'Block') {
-    const contract = config.dragonContracts.definitions.find((item) => item.powerType === 'Block');
-    effect = `Prevents all damage for ${contract.durationSeconds}s`;
-  } else if (spellType === 'Skill') {
-    const contract = config.dragonContracts.definitions.find((item) => item.powerType === 'Skill');
-    effect = `Deals ${contract.damage} damage`;
   } else if (spellType === 'Defense') {
     const shield = addClosedBonus(config.spellEffects.defenseShieldByWeight[weight], spellType, analysis, config);
     effect = `Shield blocks ${shield} damage`;

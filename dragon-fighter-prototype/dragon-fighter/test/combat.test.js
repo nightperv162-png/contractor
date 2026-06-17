@@ -219,47 +219,14 @@ test('spell cast validation checks actor, match phase, energy, cooldown', () => 
   spell.cooldownRemaining = 1;
   result = validateSpellCast(actor, spell, state, CONFIG);
   assert.equal(result.success, false);
-  assert.equal(result.reason, CONFIG.combat.cooldownReason);
+  assert.equal(result.reason, 'cooldown_active');
   
   // Match inactive
   state.phase = CONFIG.states.preparation;
   spell.cooldownRemaining = 0;
   result = validateSpellCast(actor, spell, state, CONFIG);
   assert.equal(result.success, false);
-  assert.equal(result.reason, CONFIG.combat.inactiveReason);
-});
-
-test('prototype dragon contracts execute each required power behavior', () => {
-  const state = activeState();
-  const player = state.sides[CONFIG.match.playerId];
-  const ai = state.sides[CONFIG.match.aiId];
-  const [ignivar, aegon, bront, voltaris] = player.spellLoadout;
-
-  let result = applyCast(player, ignivar, state, CONFIG.spellCasting.voiceCooldownMultiplier, CONFIG);
-  assert.equal(result.success, true);
-  assert.equal(result.effect.damage, 10);
-  assert.equal(ai.hp, CONFIG.match.startingHp - 10);
-  assert.equal(ignivar.cooldownRemaining, 2);
-
-  result = applyCast(player, aegon, state, CONFIG.spellCasting.voiceCooldownMultiplier, CONFIG);
-  assert.equal(result.success, true);
-  assert.equal(player.defenceActive, 3);
-  assert.equal(player.defenceDamageMultiplier, 0.5);
-  assert.equal(aegon.cooldownRemaining, 6);
-  applyDamage(player, 10, 0, CONFIG);
-  assert.equal(player.hp, CONFIG.match.startingHp - 5);
-
-  result = applyCast(player, bront, state, CONFIG.spellCasting.voiceCooldownMultiplier, CONFIG);
-  assert.equal(result.success, true);
-  assert.equal(player.blockActive, 1);
-  assert.equal(bront.cooldownRemaining, 5);
-  applyDamage(player, 10, 0, CONFIG);
-  assert.equal(player.hp, CONFIG.match.startingHp - 5);
-
-  result = applyCast(player, voltaris, state, CONFIG.spellCasting.voiceCooldownMultiplier, CONFIG);
-  assert.equal(result.success, true);
-  assert.equal(result.effect.damage, 25);
-  assert.equal(voltaris.cooldownRemaining, 10);
+  assert.equal(result.reason, 'match_inactive');
 });
 
 test('spell cast applies effect and deducts resources', () => {

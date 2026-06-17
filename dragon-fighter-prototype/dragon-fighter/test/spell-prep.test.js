@@ -62,34 +62,26 @@ test('loadout validation rejects duplicate and too-similar spell names', () => {
   assert.equal(validateSpellName('Water Heal', existing, CONFIG).ok, true);
 });
 
-function voidAllContracts(state) {
-  for (let index = CONFIG.match.minHp; index < CONFIG.spells.perLoadout; index += CONFIG.patterns.firstPointId) {
-    selectPreparedSpellSlot(state, index, null, CONFIG);
-    deletePreparedSpell(state, null, CONFIG);
-  }
-}
-
-test('draft dragon names cycle through prototype dragon roster', () => {
+test('generated spell names combine element and selected move type', () => {
   const state = createInitialGameState(CONFIG);
-  assert.equal(state.preparation.draftSpellName, 'Ignivar');
+  assert.equal(state.preparation.draftSpellName, 'Light Slash');
 
-  selectSpellType(state, 'Defence', null, CONFIG);
-  assert.equal(state.preparation.draftSpellName, 'Ignivar');
+  selectSpellType(state, 'Defense', null, CONFIG);
+  assert.equal(state.preparation.draftSpellName, 'Light Guard');
 
   cycleDraftName(state, null, CONFIG);
-  assert.equal(state.preparation.draftSpellName, 'Aegon');
+  assert.equal(state.preparation.draftSpellName, 'Fire Guard');
 
   selectSpellType(state, 'Attack', null, CONFIG);
-  assert.equal(state.preparation.draftSpellName, 'Aegon');
+  assert.equal(state.preparation.draftSpellName, 'Fire Slash');
 
   setDraftName(state, 'My Custom', null, CONFIG);
-  selectSpellType(state, 'Skill', null, CONFIG);
+  selectSpellType(state, 'Support', null, CONFIG);
   assert.equal(state.preparation.draftSpellName, 'My Custom');
 });
 
-test('preparation flow draws, randomizes, creates contracts, and confirms loadout', () => {
+test('preparation flow draws, randomizes, saves five spells, and confirms loadout', () => {
   const state = createInitialGameState(CONFIG);
-  voidAllContracts(state);
   addPatternPoint(state, 1, null, CONFIG);
   addPatternPoint(state, 2, null, CONFIG);
   assert.equal(state.preparation.draftAnalysis.connectionCount, 1);
@@ -112,9 +104,8 @@ test('preparation flow draws, randomizes, creates contracts, and confirms loadou
   assert.equal(state.countdownRemaining, CONFIG.match.countdownSeconds);
 });
 
-test('prepared contract slots can be selected, deleted, and refilled', () => {
+test('prepared spell slots can be selected, deleted, and refilled', () => {
   const state = createInitialGameState(CONFIG);
-  voidAllContracts(state);
 
   CONFIG.spells.types.forEach((type, index) => {
     selectSpellType(state, type, null, CONFIG);
@@ -140,7 +131,7 @@ test('prepared contract slots can be selected, deleted, and refilled', () => {
   assert.equal(state.sides[CONFIG.match.playerId].spellLoadout[2].name, 'Dark Slash');
 });
 
-test('dragon name editing blocks number keys from invoking contract slots', () => {
+test('spell name editing blocks number keys from casting spell slots', () => {
   const state = createInitialGameState(CONFIG);
   const handlers = {};
   const fakeCanvas = {

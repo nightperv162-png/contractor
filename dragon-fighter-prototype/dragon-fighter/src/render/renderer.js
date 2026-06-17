@@ -169,7 +169,7 @@ function drawHuman(ctx, x, y, color, config) {
 }
 
 function drawAura(ctx, side, x, y, width, height, config) {
-  if (side.shield > config.match.minHp || side.defenceActive > config.match.minHp || side.blockActive > config.match.minHp) {
+  if (side.shield > config.match.minHp) {
     ctx.fillStyle = config.colors.defenceAura;
     ctx.beginPath();
     ctx.ellipse(x, y, width, height, CONFIG.match.minHp, CONFIG.match.minHp, Math.PI * config.match.sideCount);
@@ -294,19 +294,17 @@ function drawVoiceButton(ctx, state, config) {
 function drawSpellButtons(ctx, state, config) {
   getSpellButtonRects(config).forEach((button) => {
     const spell = state.sides[config.match.playerId].spellLoadout[button.spellIndex];
-    const dragonName = spell.dragonName ?? spell.name;
-    const powerLabel = spell.powerName ?? spell.powerType ?? spell.type;
-    registerButton(state, button.id, button.kind, dragonName, button.rect, null, { spellIndex: button.spellIndex });
+    registerButton(state, button.id, button.kind, spell.name, button.rect, null, { spellIndex: button.spellIndex });
     drawRoundedRect(ctx, button.rect.x, button.rect.y, button.rect.width, button.rect.height, config.layout.cornerRadius, config.colors.buttonFill, config.colors.panelStroke, config.layout.panelLineWidth, config);
     const isReady = (spell.cooldownRemaining ?? config.match.minHp) <= config.match.minHp;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = config.colors.textPrimary;
     ctx.font = font(config.fonts.smallSize, config.fonts.boldWeight, config);
-    ctx.fillText(dragonName, button.rect.x + button.rect.width / config.match.sideCount, button.rect.y + config.layout.cooldownChipGap * config.match.sideCount);
+    ctx.fillText(spell.name, button.rect.x + button.rect.width / config.match.sideCount, button.rect.y + config.layout.cooldownChipGap * config.match.sideCount);
     ctx.fillStyle = config.colors.textSecondary;
     ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
-    ctx.fillText(`${powerLabel} | ${spell.energyCost} ${config.text.energyShortLabel}`, button.rect.x + button.rect.width / config.match.sideCount, button.rect.y + button.rect.height / config.match.sideCount);
+    ctx.fillText(`${spell.type} | ${spell.energyCost} ${config.text.energyShortLabel}`, button.rect.x + button.rect.width / config.match.sideCount, button.rect.y + button.rect.height / config.match.sideCount);
     ctx.fillStyle = isReady ? config.colors.cooldownReady : config.colors.cooldownBlocked;
     ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
     const cooldownLabel = isReady ? config.combat.cooldownReadyLabel : `${spell.cooldownRemaining.toFixed(config.combat.cooldownDecimalPlaces)}s`;
@@ -417,18 +415,16 @@ function drawSpellSlots(ctx, rect, state, config) {
   getPreparationSpellSlotRects(config).forEach((slot) => {
     const spell = state.sides[config.match.playerId].spellLoadout[slot.spellIndex];
     const selected = state.preparation.selectedSlotIndex === slot.spellIndex;
-    const dragonName = spell.dragonName ?? spell.name;
-    const powerLabel = spell.powerName ?? spell.powerType ?? spell.type;
-    registerButton(state, slot.id, slot.kind, dragonName, slot.rect, null, { spellIndex: slot.spellIndex });
+    registerButton(state, slot.id, slot.kind, spell.name, slot.rect, null, { spellIndex: slot.spellIndex });
     drawRoundedRect(ctx, slot.rect.x, slot.rect.y, slot.rect.width, slot.rect.height, config.layout.cornerRadius, selected ? config.colors.buttonHighlight : config.colors.buttonFill, config.colors.panelStroke, config.layout.panelLineWidth / config.match.sideCount, config);
     ctx.font = font(config.fonts.smallSize, config.fonts.boldWeight, config);
     ctx.fillStyle = config.colors.textPrimary;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(dragonName, slot.rect.x + config.layout.cooldownChipGap, slot.rect.y + config.layout.cooldownChipGap);
+    ctx.fillText(spell.name, slot.rect.x + config.layout.cooldownChipGap, slot.rect.y + config.layout.cooldownChipGap);
     ctx.font = font(config.fonts.smallSize, config.fonts.normalWeight, config);
     ctx.fillStyle = config.colors.textSecondary;
-    ctx.fillText(`${powerLabel} - ${spell.status}`, slot.rect.x + config.layout.cooldownChipGap, slot.rect.y + config.layout.cooldownChipGap + config.fonts.smallSize);
+    ctx.fillText(`${spell.type} - ${spell.status}`, slot.rect.x + config.layout.cooldownChipGap, slot.rect.y + config.layout.cooldownChipGap + config.fonts.smallSize);
   });
 }
 
@@ -445,14 +441,14 @@ function drawPreparationScreen(ctx, state, config) {
   drawPreparationPanelText(ctx, rects.forgePanel, state, config);
   panel(ctx, rects.patternControls.x, rects.patternControls.y, rects.patternControls.width, rects.patternControls.height, config);
   drawButton(ctx, state, 'random-pattern', 'random-pattern', config.text.randomPatternLabel, rects.randomPatternButton, null, config);
-  drawButton(ctx, state, 'random-spell-type', 'random-spell-type', 'Random Power', rects.randomSpellTypeButton, null, config);
+  drawButton(ctx, state, 'random-spell-type', 'random-spell-type', 'Random Type', rects.randomSpellTypeButton, null, config);
   drawButton(ctx, state, 'clear-pattern', 'clear-pattern', config.text.clearPatternLabel, rects.clearPatternButton, null, config);
 
   panel(ctx, rects.spellSlots.x, rects.spellSlots.y, rects.spellSlots.width, rects.spellSlots.height, config);
   drawSpellSlots(ctx, rects.spellSlots, state, config);
   panel(ctx, rects.finalControls.x, rects.finalControls.y, rects.finalControls.width, rects.finalControls.height, config);
   drawButton(ctx, state, 'save-spell', 'save-spell', config.text.saveSpellLabel, rects.saveSpellButton, null, config);
-  drawButton(ctx, state, 'prepare-all-spells', 'prepare-all-spells', 'Prepare All 4', rects.prepareAllSpellsButton, null, config);
+  drawButton(ctx, state, 'prepare-all-spells', 'prepare-all-spells', 'Prepare All 5', rects.prepareAllSpellsButton, null, config);
   drawButton(ctx, state, 'preview-match', 'preview-match', config.text.confirmLoadoutLabel, rects.confirmLoadoutButton, null, config);
 
 }

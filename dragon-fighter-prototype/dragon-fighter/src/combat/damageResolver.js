@@ -14,22 +14,12 @@ import { log } from '../core/logger.js';
 export function applyDamage(target, incomingDamage, piercePercent = 0, config = CONFIG) {
   let shieldAbsorbed = 0;
   let damageApplied = incomingDamage;
-  let preventedBy = '';
-
-  if (target.blockActive > config.match.minHp) {
-    shieldAbsorbed = incomingDamage;
-    damageApplied = config.match.minHp;
-    preventedBy = 'Block';
-  } else if (target.defenceActive > config.match.minHp) {
-    damageApplied = incomingDamage * (target.defenceDamageMultiplier ?? config.shieldAndDamage.fullDamageMultiplier);
-    preventedBy = 'Defence';
-  }
 
   // Check for active shield
-  if (damageApplied > config.match.minHp && target.shield && target.shield > 0) {
+  if (target.shield && target.shield > 0) {
     // Calculate pierced damage
-    const pierced = damageApplied * piercePercent;
-    const blocked = damageApplied - pierced;
+    const pierced = incomingDamage * piercePercent;
+    const blocked = incomingDamage - pierced;
 
     // Shield absorbs blocked damage
     if (target.shield >= blocked) {
@@ -45,7 +35,6 @@ export function applyDamage(target, incomingDamage, piercePercent = 0, config = 
   }
 
   // Apply remaining damage to HP
-  damageApplied = normalizeDamageAmount(damageApplied, config);
   target.hp = Math.max(config.match.minHp, target.hp - damageApplied);
   const hpAfterDamage = target.hp;
 
@@ -53,7 +42,6 @@ export function applyDamage(target, incomingDamage, piercePercent = 0, config = 
     category: 'combat',
     incomingDamage,
     piercePercent,
-    preventedBy,
     shieldAbsorbed,
     damageApplied,
     targetHpAfter: hpAfterDamage,
@@ -62,7 +50,6 @@ export function applyDamage(target, incomingDamage, piercePercent = 0, config = 
 
   return {
     damageApplied,
-    preventedBy,
     shieldAbsorbed,
     hpFinal: hpAfterDamage
   };
@@ -181,33 +168,6 @@ export function applyUtility(actor, utilityDuration, config = CONFIG) {
   };
 }
 
-export function applyDefence(actor, durationSeconds, damageMultiplier, config = CONFIG) {
-  actor.defenceActive = durationSeconds;
-  actor.defenceDamageMultiplier = damageMultiplier;
-  log(`Defence contract applied: ${durationSeconds}s at ${damageMultiplier}x damage`, {
-    category: 'combat',
-    actor: actor.id,
-    durationSeconds,
-    damageMultiplier
-  });
-  return {
-    durationSeconds,
-    damageMultiplier
-  };
-}
-
-export function applyBlock(actor, durationSeconds, config = CONFIG) {
-  actor.blockActive = durationSeconds;
-  log(`Block contract applied: ${durationSeconds}s full prevention`, {
-    category: 'combat',
-    actor: actor.id,
-    durationSeconds
-  });
-  return {
-    durationSeconds
-  };
-}
-
 function addClosedBonus(baseValue, spell, config) {
   if (!spell.pattern?.hasClosedBonus) return baseValue;
   if (spell.type === 'Attack') return baseValue + config.spellEffects.closedAttackBonusDamage;
@@ -219,10 +179,8 @@ function addClosedBonus(baseValue, spell, config) {
 }
 
 function getSpellEffectValue(spell, config) {
-  if (typeof spell.damage === 'number') return spell.damage;
   const weight = spell.weightBand ?? config.patterns.unformedLabel;
-  const powerType = spell.powerType ?? spell.type;
-  if (powerType === 'Attack' || powerType === 'Skill') return addClosedBonus(config.spellEffects.attackDamageByWeight[weight], spell, config);
+  if (spell.type === 'Attack') return addClosedBonus(config.spellEffects.attackDamageByWeight[weight], spell, config);
   if (spell.type === 'Defense') return addClosedBonus(config.spellEffects.defenseShieldByWeight[weight], spell, config);
   if (spell.type === 'Support') return addClosedBonus(config.spellEffects.supportHealByWeight[weight], spell, config);
   if (spell.type === 'Control') return addClosedBonus(config.spellEffects.controlSlowSecondsByWeight[weight], spell, config);
@@ -249,40 +207,17 @@ function addProjectile(state, actorId, targetId, config) {
 
 export function applySpellEffect(actor, target, spell, state, config = CONFIG) {
   const value = getSpellEffectValue(spell, config);
-  const powerType = spell.powerType ?? spell.type;
-  const dragonName = spell.dragonName ?? spell.name;
-  if (powerType === 'Attack' || powerType === 'Skill') {
+  if (spell.type === 'Attack') {
     const piercePercent = spell.pattern?.piercePercent ?? config.match.minHp;
     const damage = applyDamage(target, value, piercePercent, config);
     addProjectile(state, actor.id, target.id, config);
     addHitText(state, target.id, `-${damage.damageApplied}`, damage.damageApplied, config);
     state.shakeRemaining = damage.damageApplied > config.match.minHp ? config.animation.shakeSeconds : state.shakeRemaining;
     return {
-      type: powerType,
+      type: spell.type,
       damage: damage.damageApplied,
       shieldAbsorbed: damage.shieldAbsorbed,
-      feedbackMessage: `${dragonName} hit for ${damage.damageApplied} damage`
-    };
-  }
-
-  if (powerType === 'Defence') {
-    const defence = applyDefence(actor, spell.durationSeconds, spell.damageMultiplier, config);
-    addHitText(state, actor.id, `Defence ${defence.durationSeconds}s`, config.match.minHp, config);
-    return {
-      type: powerType,
-      durationSeconds: defence.durationSeconds,
-      damageMultiplier: defence.damageMultiplier,
-      feedbackMessage: `${dragonName} halves incoming damage`
-    };
-  }
-
-  if (powerType === 'Block') {
-    const block = applyBlock(actor, spell.durationSeconds, config);
-    addHitText(state, actor.id, `Block ${block.durationSeconds}s`, config.match.minHp, config);
-    return {
-      type: powerType,
-      durationSeconds: block.durationSeconds,
-      feedbackMessage: `${dragonName} blocks all incoming damage`
+      feedbackMessage: `${spell.name} hit for ${damage.damageApplied} damage`
     };
   }
 
@@ -354,17 +289,6 @@ export function updateEffectDurations(actor, deltaSeconds, config = CONFIG) {
 
   if (actor.utilityBonusActive && typeof actor.utilityBonusActive === 'number') {
     actor.utilityBonusActive = Math.max(0, actor.utilityBonusActive - deltaSeconds);
-  }
-
-  if (actor.defenceActive && typeof actor.defenceActive === 'number') {
-    actor.defenceActive = Math.max(0, actor.defenceActive - deltaSeconds);
-    if (actor.defenceActive <= config.match.minHp) {
-      actor.defenceDamageMultiplier = config.shieldAndDamage.fullDamageMultiplier;
-    }
-  }
-
-  if (actor.blockActive && typeof actor.blockActive === 'number') {
-    actor.blockActive = Math.max(0, actor.blockActive - deltaSeconds);
   }
 }
 

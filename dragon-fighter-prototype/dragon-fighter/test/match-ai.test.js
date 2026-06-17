@@ -20,7 +20,7 @@ test('countdown transitions to active phase and displays fight banner', () => {
   assert.equal(state.fightBannerRemaining, CONFIG.match.fightBannerSeconds);
 });
 
-test('AI chooses a ready affordable prepared contract', () => {
+test('AI chooses a ready affordable prepared spell', () => {
   const state = activeState();
   state.sides[CONFIG.match.aiId].spellLoadout.forEach((spell) => {
     spell.filled = true;
