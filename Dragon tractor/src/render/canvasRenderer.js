@@ -44,11 +44,84 @@ function drawTopBar(ctx, state, config = CONFIG) {
   drawText(ctx, state.activeScreen, config.layout.topBarRect.x + config.app.safeAreaPadding, config.layout.topBarRect.y + config.app.safeAreaPadding + config.visuals.fontSizeLarge, config.visuals.fontSizeSmall, config.visuals.colorTextSecondary);
   drawButton(ctx, config.layout.prevButtonRect, config.labels.previousButton, config);
   drawButton(ctx, config.layout.nextButtonRect, config.labels.nextButton, config);
-  if (state.activeScreen === config.states.combat) drawButton(ctx, config.layout.pauseButtonRect, config.labels.pauseButton, config);
+  if (state.activeScreen === config.states.match) drawButton(ctx, config.layout.pauseButtonRect, config.labels.pauseButton, config);
   drawButton(ctx, config.layout.guideButtonRect, config.labels.guideButton, config);
 }
 
-function drawCreation(ctx, config = CONFIG) {
+export function getLibraryEmptyMessage(config = CONFIG) {
+  return config.text.emptyLibraryText;
+}
+
+export function getContractCardLines(contract) {
+  return [
+    contract.fullContractName,
+    `${contract.contractType} | Call: ${contract.callName}`,
+    `Cost: ${contract.cost} | Grade: ${contract.grade}`
+  ];
+}
+
+export function getContractDetailsLines(detailsOverlay) {
+  const contract = detailsOverlay.contract;
+  const lines = [
+    contract.fullContractName,
+    `${contract.contractType} Contract`,
+    `Effect: ${contract.effect}`,
+    contract.duration ? `Duration/rate: ${contract.duration}` : null,
+    `Energy Cost: ${contract.cost}`,
+    `Cooldown: ${contract.cooldown}`,
+    `Grade: ${contract.grade}`,
+    `Trait: ${contract.trait}`,
+    `Resonance: ${contract.resonance}`
+  ].filter(Boolean);
+  if (detailsOverlay.currentCallName) lines.push(`Current Call Name: ${detailsOverlay.currentCallName}`);
+  return lines;
+}
+
+export function formatCompactSlotCard(slot, config = CONFIG) {
+  return `[${slot.markerLabel}] ${slot.resolvedCallName.padEnd(config.contracts.compactCallNamePadLength, ' ')} ${slot.energyCost}`;
+}
+
+function drawContractCard(ctx, rect, contract, config = CONFIG) {
+  drawRoundRect(ctx, rect, config.visuals.colorPanelRaised, config.visuals.colorPanelBorder, config);
+  const x = rect.x + config.app.safeAreaPadding / 2;
+  let y = rect.y + config.app.safeAreaPadding / 3;
+  getContractCardLines(contract).forEach((line, index) => {
+    drawText(ctx, line, x, y, index === 0 ? config.visuals.fontSizeMedium : config.visuals.fontSizeSmall, index === 0 ? config.visuals.colorTextPrimary : config.visuals.colorTextSecondary);
+    y += config.visuals.fontSizeMedium;
+  });
+}
+
+function drawDetailsOverlay(ctx, detailsOverlay, config = CONFIG) {
+  drawRoundRect(ctx, config.layout.detailsOverlayRect, config.visuals.overlayBackgroundColor, config.visuals.colorAccent, config);
+  const x = config.layout.detailsOverlayRect.x + config.app.safeAreaPadding;
+  let y = config.layout.detailsOverlayRect.y + config.app.safeAreaPadding;
+  drawText(ctx, config.labels.contractDetails, x, y, config.visuals.fontSizeLarge, config.visuals.colorAccent);
+  y += config.visuals.fontSizeHuge;
+  getContractDetailsLines(detailsOverlay).forEach((line) => {
+    drawText(ctx, line, x, y, config.visuals.fontSizeMedium, config.visuals.colorTextPrimary);
+    y += config.visuals.fontSizeLarge;
+  });
+}
+
+function drawLibrary(ctx, state, config = CONFIG) {
+  drawRoundRect(ctx, config.layout.libraryScreenRect, config.visuals.colorPanelBackground, config.visuals.colorPanelBorder, config);
+  drawText(ctx, 'Contract Library', config.layout.libraryScreenRect.x + config.app.safeAreaPadding, config.layout.libraryScreenRect.y + config.app.safeAreaPadding, config.visuals.fontSizeLarge);
+  if (state.contractLibrary.length === 0) {
+    const center = rectCenter(config.layout.libraryScreenRect);
+    drawText(ctx, getLibraryEmptyMessage(config), center.x, center.y - config.visuals.fontSizeLarge, config.visuals.fontSizeMedium, config.visuals.colorTextSecondary, 'center');
+    drawButton(ctx, config.layout.emptyLibraryButtonRect, config.labels.createFirstContract, config);
+  } else {
+    state.contractLibrary.forEach((contract, index) => {
+      const rect = config.layout.libraryCardRects[index];
+      if (rect) drawContractCard(ctx, rect, contract, config);
+    });
+    drawButton(ctx, config.layout.prepareLoadoutButtonRect, config.labels.prepareLoadout, config);
+  }
+  if (state.latestFailureReason) drawText(ctx, state.latestFailureReason, config.layout.libraryScreenRect.x + config.app.safeAreaPadding, config.layout.libraryScreenRect.y + config.layout.libraryScreenRect.height - config.app.safeAreaPadding * 2, config.visuals.fontSizeMedium, config.visuals.colorTextWarning);
+  if (state.detailsOverlay) drawDetailsOverlay(ctx, state.detailsOverlay, config);
+}
+
+function drawCreation(ctx, state, config = CONFIG) {
   drawRoundRect(ctx, config.layout.leftPanelRect, config.visuals.colorPanelBackground, config.visuals.colorPanelBorder, config);
   drawText(ctx, 'Contract Creation', config.layout.leftPanelRect.x + config.app.safeAreaPadding, config.layout.leftPanelRect.y + config.app.safeAreaPadding, config.visuals.fontSizeLarge);
   drawRoundRect(ctx, config.layout.contractTypeSelectorRect, config.visuals.colorPanelRaised, config.visuals.colorAccent, config);
@@ -56,34 +129,67 @@ function drawCreation(ctx, config = CONFIG) {
   drawRoundRect(ctx, config.layout.drawingAreaRect, config.app.backgroundColor, config.visuals.colorAccentWarm, config);
   const drawCenter = rectCenter(config.layout.drawingAreaRect);
   drawText(ctx, config.labels.drawSigil, drawCenter.x, drawCenter.y - config.visuals.fontSizeMedium / 2, config.visuals.fontSizeMedium, config.visuals.colorTextSecondary, 'center');
-  drawAnalysisReceipt(ctx, config);
+  if (state.contractCreation.hasDrawing) {
+    drawAnalysisReceipt(ctx, state.contractCreation.analysisContract, config);
+  } else {
+    drawRoundRect(ctx, config.layout.analysisPanelRect, config.visuals.colorPanelBackground, config.visuals.colorPanelBorder, config);
+    drawText(ctx, config.labels.drawFirst, config.layout.analysisPanelRect.x + config.app.safeAreaPadding, config.layout.analysisPanelRect.y + config.app.safeAreaPadding, config.visuals.fontSizeMedium, config.visuals.colorTextSecondary);
+  }
+  if (state.latestFailureReason) drawText(ctx, state.latestFailureReason, config.layout.leftPanelRect.x + config.app.safeAreaPadding, config.layout.leftPanelRect.y + config.layout.leftPanelRect.height - config.app.safeAreaPadding * 2, config.visuals.fontSizeSmall, config.visuals.colorTextWarning);
 }
 
-function drawAnalysisReceipt(ctx, config = CONFIG) {
+function drawAnalysisReceipt(ctx, contract = CONFIG.contracts.sampleAnalysisContract, config = CONFIG) {
   drawRoundRect(ctx, config.layout.analysisPanelRect, config.visuals.colorPanelBackground, config.visuals.colorPanelBorder, config);
   const x = config.layout.analysisPanelRect.x + config.app.safeAreaPadding;
   let y = config.layout.analysisPanelRect.y + config.app.safeAreaPadding;
   drawText(ctx, 'CONTRACT ANALYSIS', x, y, config.visuals.fontSizeMedium, config.visuals.colorAccent);
   y += config.visuals.fontSizeLarge;
-  ['Dragon - Trait - Power:', 'Ignivar - Fierce - Flame Bite', 'Contract Call: Ignivar', 'Effect: 12 Damage', 'Cost: 10 Energy', 'Cooldown: 1.5s', 'Why: Sigil preview placeholder.'].forEach((line) => {
-    drawText(ctx, line, x, y, config.visuals.fontSizeMedium, line.includes(':') ? config.visuals.colorTextPrimary : config.visuals.colorTextSecondary);
+  [
+    'Dragon - Trait - Power:',
+    contract.dragonTraitPower,
+    'Contract Call:',
+    `[${contract.callName}]`,
+    'Must be one word from this contract.',
+    'Effect:',
+    contract.effect,
+    'Cost:',
+    contract.cost,
+    'Cooldown:',
+    contract.cooldown,
+    'Why:',
+    contract.why
+  ].forEach((line) => {
+    drawText(ctx, line, x, y, config.visuals.fontSizeMedium, line.endsWith(':') ? config.visuals.colorTextPrimary : config.visuals.colorTextSecondary);
     y += config.visuals.fontSizeLarge;
   });
-  drawButton(ctx, { ...config.layout.analysisPanelRect, x, y: config.layout.analysisPanelRect.y + config.layout.analysisPanelRect.height - config.app.safeAreaPadding * 3, width: 156, height: 44 }, config.labels.saveContract, config);
-  drawButton(ctx, { ...config.layout.analysisPanelRect, x: x + 184, y: config.layout.analysisPanelRect.y + config.layout.analysisPanelRect.height - config.app.safeAreaPadding * 3, width: 124, height: 44 }, config.labels.redraw, config);
+  drawButton(ctx, config.layout.rerollButtonRect, config.labels.reroll, config);
+  drawButton(ctx, config.layout.saveContractButtonRect, config.labels.saveContract, config);
+  drawButton(ctx, config.layout.redrawButtonRect, config.labels.redraw, config);
 }
 
-function drawLoadout(ctx, config = CONFIG) {
+function drawLoadout(ctx, state, config = CONFIG) {
   drawRoundRect(ctx, config.layout.libraryRect, config.visuals.colorPanelBackground, config.visuals.colorPanelBorder, config);
   drawText(ctx, 'Contract Library', config.layout.libraryRect.x + config.app.safeAreaPadding, config.layout.libraryRect.y + config.app.safeAreaPadding, config.visuals.fontSizeLarge);
-  drawText(ctx, 'Saved contract placeholders', config.layout.libraryRect.x + config.app.safeAreaPadding, config.layout.libraryRect.y + config.app.safeAreaPadding * 3, config.visuals.fontSizeMedium, config.visuals.colorTextSecondary);
+  state.contractLibrary.forEach((contract, index) => {
+    const rect = config.layout.libraryCardRects[index];
+    if (!rect) return;
+    const compactRect = {
+      x: config.layout.libraryRect.x + config.app.safeAreaPadding,
+      y: config.layout.libraryRect.y + config.app.safeAreaPadding * 3 + index * config.layout.loadoutLibraryCardHeight,
+      width: config.layout.libraryRect.width - config.app.safeAreaPadding * 2,
+      height: config.layout.loadoutLibraryCardHeight - config.visuals.strokeThin
+    };
+    drawContractCard(ctx, compactRect, contract, config);
+  });
   config.layout.loadoutSlotRects.forEach((rect, index) => {
+    const slot = state.equippedSlots[index];
     drawRoundRect(ctx, rect, config.visuals.colorPanelBackground, config.visuals.colorPanelBorder, config);
     drawText(ctx, `Slot ${config.contracts.slotMarkerLabels[index]}`, rect.x + config.app.safeAreaPadding / 2, rect.y + config.app.safeAreaPadding / 2, config.visuals.fontSizeMedium);
-    drawText(ctx, `Call: ${config.contracts.placeholderCallNames[index]}`, rect.x + config.app.safeAreaPadding / 2, rect.y + config.app.safeAreaPadding * 1.5, config.visuals.fontSizeSmall, config.visuals.colorTextSecondary);
-    drawText(ctx, `Resonance: ${config.contracts.resonanceLabels[0]}`, rect.x + rect.width / 2, rect.y + config.app.safeAreaPadding * 1.5, config.visuals.fontSizeSmall, config.visuals.colorAccent, 'center');
+    drawText(ctx, `Call: ${slot.resolvedCallName}`, rect.x + config.app.safeAreaPadding / 2, rect.y + config.app.safeAreaPadding * 1.5, config.visuals.fontSizeSmall, config.visuals.colorTextSecondary);
+    drawText(ctx, `Resonance: ${slot.resonanceLabel}`, rect.x + rect.width / 2, rect.y + config.app.safeAreaPadding * 1.5, config.visuals.fontSizeSmall, config.visuals.colorAccent, 'center');
   });
   drawButton(ctx, { x: config.layout.rightPanelRect.x, y: config.layout.rightPanelRect.y, width: config.layout.rightPanelRect.width, height: config.layout.guideButtonRect.height }, config.labels.startBattle, config);
+  if (state.detailsOverlay) drawDetailsOverlay(ctx, state.detailsOverlay, config);
 }
 
 function drawBar(ctx, rect, fill, missing, label, config = CONFIG) {
@@ -152,9 +258,7 @@ function drawCombat(ctx, state, config = CONFIG) {
   config.layout.combatSlotRects.forEach((rect, index) => {
     const slot = state.equippedSlots[index];
     drawRoundRect(ctx, rect, config.visuals.colorPanelBackground, config.visuals.colorCooldownReady, config);
-    drawText(ctx, `[${slot.markerLabel}] ${slot.resolvedCallName}`, rect.x + config.app.safeAreaPadding / 2, rect.y + config.app.safeAreaPadding / 2, config.visuals.fontSizeMedium);
-    drawText(ctx, `${slot.energyCost}`, rect.x + rect.width - config.app.safeAreaPadding, rect.y + config.app.safeAreaPadding / 2, config.visuals.fontSizeMedium, config.visuals.colorAccent, 'right');
-    drawText(ctx, slot.stateLabel, rect.x + config.app.safeAreaPadding / 2, rect.y + config.app.safeAreaPadding * 1.5, config.visuals.fontSizeSmall, config.visuals.colorTextSecondary);
+    drawText(ctx, formatCompactSlotCard(slot, config), rect.x + config.app.safeAreaPadding / 2, rect.y + config.app.safeAreaPadding / 2, config.visuals.fontSizeMedium);
   });
 }
 
@@ -167,7 +271,9 @@ function drawPause(ctx, config = CONFIG) {
 function drawResult(ctx, config = CONFIG) {
   drawRoundRect(ctx, config.layout.resultOverlayRect, config.visuals.colorPanelBackground, config.visuals.colorPanelBorder, config);
   drawText(ctx, config.text.resultTitle, rectCenter(config.layout.resultOverlayRect).x, config.layout.resultOverlayRect.y + config.app.safeAreaPadding * 3, config.visuals.fontSizeHuge, config.visuals.colorTextPrimary, 'center');
-  drawText(ctx, 'Restart and return-to-loadout placeholders', rectCenter(config.layout.resultOverlayRect).x, config.layout.resultOverlayRect.y + config.app.safeAreaPadding * 6, config.visuals.fontSizeMedium, config.visuals.colorTextSecondary, 'center');
+  drawText(ctx, 'Return while preserving saved contracts.', rectCenter(config.layout.resultOverlayRect).x, config.layout.resultOverlayRect.y + config.app.safeAreaPadding * 6, config.visuals.fontSizeMedium, config.visuals.colorTextSecondary, 'center');
+  drawButton(ctx, config.layout.resultLibraryButtonRect, config.labels.returnToLibrary, config);
+  drawButton(ctx, config.layout.resultLoadoutButtonRect, config.labels.returnToLoadout, config);
 }
 
 function drawGuide(ctx, state, config = CONFIG) {
@@ -191,10 +297,11 @@ export function renderGame(ctx, state, config = CONFIG) {
   ctx.fillStyle = config.app.backgroundColor;
   ctx.fillRect(0, 0, config.app.canvasWidth, config.app.canvasHeight);
   drawTopBar(ctx, state, config);
-  if (state.activeScreen === config.states.contractCreation) drawCreation(ctx, config);
-  if (state.activeScreen === config.states.contractAnalysis) drawAnalysisReceipt(ctx, config);
-  if (state.activeScreen === config.states.loadout) drawLoadout(ctx, config);
-  if (state.activeScreen === config.states.combat) drawCombat(ctx, state, config);
+  if (state.activeScreen === config.states.contractLibrary) drawLibrary(ctx, state, config);
+  if (state.activeScreen === config.states.contractCreation) drawCreation(ctx, state, config);
+  if (state.activeScreen === config.states.loadout) drawLoadout(ctx, state, config);
+  if (state.activeScreen === config.states.countdown) drawCombat(ctx, state, config);
+  if (state.activeScreen === config.states.match) drawCombat(ctx, state, config);
   if (state.activeScreen === config.states.pause) drawPause(ctx, config);
   if (state.activeScreen === config.states.result) drawResult(ctx, config);
   if (state.isGuideOpen) drawGuide(ctx, state, config);

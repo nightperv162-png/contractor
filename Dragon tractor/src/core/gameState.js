@@ -1,6 +1,8 @@
 import { CONFIG } from '../config.js';
+import { createLoadoutFromLibrary } from '../contracts/contractLibrary.js';
 
 export function createInitialGameState(config = CONFIG) {
+  const contractLibrary = [];
   return {
     activeScreen: config.states.initialScreen,
     previousScreen: null,
@@ -9,6 +11,12 @@ export function createInitialGameState(config = CONFIG) {
     selectedContractType: config.contracts.enabledContractTypes[0],
     latestInput: null,
     latestFailureReason: null,
+    nextContractNumber: config.numbers.firstContractNumber,
+    contractCreation: {
+      hasDrawing: false,
+      analysisContract: null
+    },
+    detailsOverlay: null,
     match: {
       timerSeconds: config.match.matchDurationSeconds,
       countdownSeconds: config.match.countdownSeconds,
@@ -24,16 +32,8 @@ export function createInitialGameState(config = CONFIG) {
       maxHp: config.match.baseMaxHp,
       energy: config.match.startingEnergy
     },
-    contractLibrary: [],
-    equippedSlots: config.contracts.slotMarkerLabels.map((markerLabel, index) => ({
-      slotId: markerLabel,
-      markerLabel,
-      contractId: null,
-      resolvedCallName: config.contracts.placeholderCallNames[index],
-      energyCost: config.contracts.placeholderEnergyCosts[index],
-      resonanceLabel: config.contracts.resonanceLabels[0],
-      stateLabel: config.labels.readyState
-    })),
+    contractLibrary,
+    equippedSlots: createLoadoutFromLibrary(contractLibrary, config),
     guide: {
       screen: config.states.initialScreen
     }

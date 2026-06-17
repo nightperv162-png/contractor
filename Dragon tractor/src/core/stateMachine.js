@@ -2,10 +2,11 @@ import { CONFIG } from '../config.js';
 
 export function getOrderedScreens(config = CONFIG) {
   return [
+    config.states.contractLibrary,
     config.states.contractCreation,
-    config.states.contractAnalysis,
     config.states.loadout,
-    config.states.combat,
+    config.states.countdown,
+    config.states.match,
     config.states.pause,
     config.states.result
   ];
@@ -23,6 +24,7 @@ export function transitionTo(state, screen, config = CONFIG, logger) {
     activeScreen: screen,
     isGuideOpen: false,
     isPaused: screen === config.states.pause,
+    detailsOverlay: null,
     guide: { screen }
   };
 }
@@ -32,7 +34,7 @@ export function openGuide(state, logger) {
   return {
     ...state,
     isGuideOpen: true,
-    isPaused: state.activeScreen === CONFIG.states.combat ? true : state.isPaused,
+    isPaused: state.activeScreen === CONFIG.states.match ? true : state.isPaused,
     guide: { screen: state.activeScreen }
   };
 }
@@ -42,7 +44,7 @@ export function closeGuide(state, logger) {
   return {
     ...state,
     isGuideOpen: false,
-    isPaused: state.activeScreen === CONFIG.states.combat ? false : state.isPaused
+    isPaused: state.activeScreen === CONFIG.states.match ? false : state.isPaused
   };
 }
 
