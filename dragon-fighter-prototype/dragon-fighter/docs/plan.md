@@ -1,4 +1,4 @@
-# Voice Dragon Battle - Current Plan
+# Dragon Fighter - Current Plan
 
 ## Done
 

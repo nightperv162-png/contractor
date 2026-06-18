@@ -1,4 +1,4 @@
-# Dragon Canvas Battle
+# Dragon Fighter
 
 A single-file HTML5 Canvas dragon battle prototype.
 

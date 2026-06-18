@@ -1,4 +1,4 @@
-# Voice Dragon Battle - Technical Design
+# Dragon Fighter - Technical Design
 
 ## Current Source
 
@@ -67,7 +67,7 @@ Canvas fallback controls and keyboard shortcuts call the same `useCommand` path 
 
 ## Diagnostics
 
-The game logs key events with the `[VoiceBattle]` prefix:
+The game logs key events with the `[DragonFighter]` prefix:
 
 - asset load or failure
 - reset
