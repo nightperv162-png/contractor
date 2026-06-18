@@ -1,47 +1,35 @@
-import { createReadStream, existsSync } from 'node:fs';
-import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { extname, join, normalize, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { extname, join, normalize } from 'node:path';
 import { CONFIG } from '../src/config.js';
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const port = Number(process.env.PORT || CONFIG.diagnostics.devServerPort);
-
-const mimeTypes = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.md': 'text/markdown; charset=utf-8',
-  '.txt': 'text/plain; charset=utf-8'
-};
-
-function safeResolve(urlPath) {
-  const cleaned = normalize(decodeURIComponent(urlPath.split('?')[0])).replace(/^\.\.(\/|\\|$)/, '');
-  const requested = resolve(root, cleaned === '/' ? 'index.html' : cleaned.slice(1));
-  return requested.startsWith(root) ? requested : join(root, 'index.html');
-}
+const { port, host, fallbackFile, contentTypes, notFoundMessage } = CONFIG.diagnostics.devServer;
 
 const server = createServer(async (request, response) => {
+  const url = new URL(request.url, `http://${host}:${port}`);
+  const requestedPath = url.pathname === CONFIG.diagnostics.devServer.rootPath
+    ? fallbackFile
+    : url.pathname.slice(CONFIG.math.firstContentIndex);
+  const safePath = normalize(requestedPath).replace(
+    CONFIG.diagnostics.devServer.unsafePathPattern,
+    CONFIG.diagnostics.devServer.emptyPath
+  );
+  const filePath = join(process.cwd(), safePath);
+
   try {
-    let filePath = safeResolve(request.url || '/');
-    const fileStat = await stat(filePath).catch(() => null);
-    if (!fileStat || fileStat.isDirectory()) filePath = join(root, 'index.html');
-    if (!existsSync(filePath)) {
-      response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      response.end('Not found');
-      return;
-    }
-    response.writeHead(200, { 'Content-Type': mimeTypes[extname(filePath)] || 'application/octet-stream' });
-    createReadStream(filePath).pipe(response);
-  } catch (error) {
-    response.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-    response.end(error.message);
+    const data = await readFile(filePath);
+    response.writeHead(CONFIG.diagnostics.devServer.httpOk, {
+      'Content-Type': contentTypes[extname(filePath)] ?? contentTypes.default
+    });
+    response.end(data);
+  } catch {
+    response.writeHead(CONFIG.diagnostics.devServer.httpNotFound, {
+      'Content-Type': contentTypes.default
+    });
+    response.end(notFoundMessage);
   }
 });
 
-server.listen(port, () => {
-  console.log(`${CONFIG.logging.prefix} Dev server running at http://localhost:${port}`);
+server.listen(port, host, () => {
+  console.log(`${CONFIG.logging.prefix} dev server running at http://${host}:${port}`);
 });

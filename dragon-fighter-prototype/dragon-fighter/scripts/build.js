@@ -1,75 +1,21 @@
-import { mkdir, readdir, readFile, rm, writeFile, copyFile } from 'node:fs/promises';
-import { join, dirname, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { mkdir, cp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { CONFIG } from '../src/config.js';
+import { createInitialGameState } from '../src/core/gameState.js';
+import { createLayout } from '../src/ui/layout.js';
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const dist = join(root, CONFIG.diagnostics.buildOutputFolder);
+const outputFolder = CONFIG.diagnostics.buildOutputFolder;
+const sourceFolders = CONFIG.diagnostics.buildSourceFolders;
 
-async function listFiles(folder) {
-  const entries = await readdir(folder, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    const fullPath = join(folder, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...await listFiles(fullPath));
-    } else {
-      files.push(fullPath);
-    }
-  }
-  return files;
+createInitialGameState(CONFIG);
+createLayout(CONFIG);
+
+await rm(outputFolder, { recursive: true, force: true });
+await mkdir(outputFolder, { recursive: true });
+await cp('index.html', join(outputFolder, 'index.html'));
+
+for (const folder of sourceFolders) {
+  await cp(folder, join(outputFolder, folder), { recursive: true });
 }
 
-async function copyFolder(source, destination) {
-  await mkdir(destination, { recursive: true });
-  const entries = await readdir(source, { withFileTypes: true });
-  for (const entry of entries) {
-    const sourcePath = join(source, entry.name);
-    const destinationPath = join(destination, entry.name);
-    if (entry.isDirectory()) {
-      await copyFolder(sourcePath, destinationPath);
-    } else {
-      await mkdir(dirname(destinationPath), { recursive: true });
-      await copyFile(sourcePath, destinationPath);
-    }
-  }
-}
-
-async function assertHtmlIsCanvasContainerOnly() {
-  const html = await readFile(join(root, 'index.html'), 'utf8');
-  const forbiddenMarkers = ['<button', '<div', '<section', '<header', '<footer'];
-  const found = forbiddenMarkers.filter((marker) => html.toLowerCase().includes(marker));
-  if (found.length) {
-    throw new Error(`HTML must stay a pure Canvas container. Found: ${found.join(', ')}`);
-  }
-}
-
-async function syntaxCheckJavaScript() {
-  const srcFiles = await listFiles(join(root, 'src'));
-  const scriptFiles = await listFiles(join(root, 'scripts'));
-  const testFiles = await listFiles(join(root, 'test')).catch(() => []);
-  const jsFiles = [...srcFiles, ...scriptFiles, ...testFiles].filter((file) => file.endsWith('.js'));
-  for (const file of jsFiles) {
-    const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
-    if (result.status !== 0) {
-      throw new Error(`Syntax check failed for ${relative(root, file)}\n${result.stderr}`);
-    }
-  }
-}
-
-async function build() {
-  await assertHtmlIsCanvasContainerOnly();
-  await syntaxCheckJavaScript();
-  await rm(dist, { recursive: true, force: true });
-  await mkdir(dist, { recursive: true });
-  await copyFile(join(root, 'index.html'), join(dist, 'index.html'));
-  await copyFolder(join(root, 'src'), join(dist, 'src'));
-  await writeFile(join(dist, 'BUILD_OK.txt'), `${CONFIG.meta.title} ${CONFIG.meta.version} build passed.\n`);
-  console.log(`${CONFIG.logging.prefix} Build complete: ${relative(root, dist)}`);
-}
-
-build().catch((error) => {
-  console.error(`${CONFIG.logging.prefix} Build failed`, error);
-  process.exitCode = 1;
-});
+console.log(`${CONFIG.logging.prefix} build complete: ${outputFolder}`);

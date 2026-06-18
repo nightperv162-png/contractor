@@ -16,5 +16,6 @@
     "voice-command"
   ],
   "author": "",
+  "private": true,
   "license": "UNLICENSED"
 }

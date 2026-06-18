@@ -1,351 +1,480 @@
-# Dragon Fighter: Egg Spell Forge - TDD
+# Dragon Fighter — Prototype TDD
 
 ## Purpose
 
-This Technical Design Document is the implementation guide for the Canvas-only Dragon Fighter prototype. The GDD owns player-facing design intent. This TDD owns architecture, code conventions, formulas, diagnostics, tests, build rules, and tunable configuration.
+This Technical Design Document defines how to implement the **Dragon Fighter** prototype described in `gdd.md`. The goal is a small, maintainable vertical slice where all combat rules, timing, UI layout values, and playtest tuning values are centralized and easy to adjust.
 
-The current prototype has a working spell-preparation flow, countdown-to-active match loop, and player spell combat. Prepared spells validate, spend energy, start cooldowns, apply type-specific effects, update combat feedback, and can end the match. The AI remains a stationary dummy until the next milestone.
+This document is implementation guidance, not production architecture. Keep the prototype simple, testable, and easy for non-coders to modify.
 
-## Non-Negotiable Engineering Rules
+## Required Engineering Principles
 
-- Single centralized configuration: all mechanical, physical, visual, timing, input, AI, text, balance, and rule constants live in `src/config.js`.
-- Zero magic numbers: do not hardcode pixel dimensions, colors, speeds, cooldowns, friction, limits, turn counts, or balance values in game loop, physics, render, input, combat, AI, or state files.
-- Self-documenting config: every config key must have a natural-language comment explaining what it changes, how it affects the prototype, and a recommended playtest range.
-- Canvas-only UI: all gameplay UI, characters, buttons, labels, overlays, event regions, and feedback are created and rendered inside the Canvas. `index.html` is only a Canvas and script container.
-- Maximum separation of concerns: source files are decoupled by responsibility. Input maps intent; states own flow; spell modules analyze spells; combat resolves rules; render draws state; UI layout calculates regions; config stores tunables.
-- Logic remains testable without Canvas, browser permissions, microphone input, or real time.
-- Add essential logging at key interactions so a non-coder can follow what happened from console output.
-- Add practical comments near important behavior that designers may tune. Avoid comments that only restate obvious code.
-- Every new feature or design change updates or adds tests for affected logic.
-- Every completed request ends with tests, build, server diagnostics, and a Git commit if checks pass.
+### Single Centralized Configuration
 
-## Source Architecture
+Use one dedicated configuration module, recommended as `src/config.js`, as the only place where mechanical, physical, visual, timing, and rules-based constants live.
 
-Recommended source ownership:
+The config must include every tunable value for:
+
+- canvas size and safe areas
+- colors and visual theme values
+- match timer and countdown timing
+- player and AI starting stats
+- action damage, duration, and cooldowns
+- AI decision timing and behavior weights
+- camera framing and arena positions
+- UI panel positions, sizes, labels, and spacing
+- input command words and fallback key bindings
+- debug and logging toggles
+
+No game loop, physics, combat, input, AI, or rendering file may define its own gameplay constants.
+
+### Zero Magic Numbers
+
+Do not hardcode pixel dimensions, cooldowns, damage values, colors, animation timing, hit delays, text sizes, turn limits, or AI intervals inside implementation files. All such values must be read from `src/config.js`.
+
+Small numeric values used only for local calculation indexes are acceptable, but anything that affects gameplay, UI, timing, visuals, or balance belongs in config.
+
+### Self-Documenting Config
+
+Every config key must have a natural-language comment explaining:
+
+- what the value changes
+- how it affects gameplay or presentation
+- the recommended safe range for playtesting
+
+Example comment style:
+
+> `attackDamage`: Damage dealt by a basic Attack before Block or Defence is applied. Recommended range: 5–20.
+
+### Separation of Concerns
+
+Each source file should own one responsibility. Combat rules should not render UI. Input should not directly change HP. UI should not decide who wins. The main loop should coordinate systems, not contain game rules.
+
+### Canvas-Only Game Surface
+
+All UI elements, game characters, labels, overlays, buttons, event feedback, and visual controls must be created and rendered inside the Canvas.
+
+The HTML page is only a container for the Canvas and script loading. It must not contain gameplay visuals, UI controls, command buttons, HUD markup, overlays, or game logic.
+
+## Recommended Source Structure
+
+Use a small modular structure similar to this:
 
 ```text
 src/
-  config.js                 centralized tunables only
-  main.js                   bootstraps Canvas, state, input, loop, renderer
+  config.js
+  main.js
   core/
-    gameLoop.js             frame timing and update/render orchestration
-    gameState.js            plain serializable state creation/reset
-    logger.js               config-gated diagnostics
-    random.js               deterministic random helpers
-    stateMachine.js         state transitions and guards
+    gameLoop.js
+    gameState.js
+    logger.js
   states/
-    preparationState.js     egg spell forge interactions
-    matchState.js           countdown, active match, result flow
-  spells/
-    patternAnalyzer.js      9-dot pattern math
-    spellFactory.js         spell object creation
-    spellLoadout.js         spell name/loadout validation
-    spellRules.js           spell summaries and effect previews
+    bootState.js
+    countdownState.js
+    matchState.js
+    resultState.js
+    pauseState.js
   combat/
-    casting.js              target spell-casting pipeline
-    cooldowns.js            cooldown ticking and readiness
-    damageResolver.js       shield, piercing, HP, healing
-    matchRules.js           result and timer rules
+    actions.js
+    damageResolver.js
+    cooldowns.js
+    matchRules.js
   ai/
-    aiController.js         AI decisions using shared spell rules
+    aiController.js
   input/
-    inputController.js      keyboard, pointer, voice intent mapping
+    voiceInput.js
+    keyboardInput.js
+    pointerInput.js
+    inputMapper.js
   render/
-    renderer.js             Canvas drawing only
+    canvasRenderer.js
+    arenaRenderer.js
+    dragonRenderer.js
+    hudRenderer.js
+    overlayRenderer.js
   ui/
-    layout.js               Canvas hitboxes and layout regions
-test/
-  *.test.js                 Node tests for logic modules
+    canvasButtonSystem.js
+    layout.js
+  assets/
+    assetManifest.js
+    assetLoader.js
+  tests/
+    combat.test.js
+    cooldowns.test.js
+    ai.test.js
+    matchRules.test.js
+    inputMapper.test.js
 ```
 
-Exact filenames may change, but ownership boundaries should stay clear.
+The exact names may change, but the responsibility split must remain clear.
 
-## Runtime States
+## System Responsibilities
 
-- `preparation`: player draws or randomizes egg patterns, chooses type, edits name, saves five spell slots, and confirms loadout.
-- `match-preview`: optional static battle layout state for layout inspection.
-- `countdown`: match-start countdown after loadout confirmation; combat input is visibly inactive.
-- `active`: playable spell combat state.
-- `result`: future Win, Lose, or Draw summary and restart flow.
+### Main Entry
 
-Only the active state should process its own gameplay inputs.
+Initializes the Canvas, loads config, starts logging, creates the initial game state, registers input systems, and starts the game loop.
 
-## Target Spell Combat Pipeline
+It must not contain combat rules, cooldown math, rendering details, or AI decision logic.
 
-Prepared spells are the main combat controls. Basic action commands are not target design.
+### Game Loop
 
-```text
-raw input -> normalized cast attempt -> spell lookup -> validation -> cost/cooldown -> effect -> state feedback -> render
-```
-
-Input sources:
-
-- Voice: complete prepared spell name.
-- Canvas: prepared spell button.
-- Keyboard: optional testing shortcut that maps to a prepared spell slot.
-
-Validation:
-
-- Actor exists and is not defeated.
-- Match phase is active.
-- Spell exists in confirmed loadout.
-- Actor has enough energy.
-- Spell cooldown is ready.
-- Voice retry delay and global voice lockout allow the cast.
-
-Failure reasons must be user-facing and logged: unknown spell, inactive match, defeated, not enough energy, cooldown, voice retry, or voice lockout.
-
-## Core Formulas And Rules
-
-Use config values for every threshold, label, cost, and duration.
-
-Energy:
-
-```text
-energy = clamp(currentEnergy + regenPerSecond * deltaSeconds, minEnergy, maxEnergy)
-```
-
-Pattern weight:
-
-```text
-Light    = 1-2 connections
-Standard = 3-4 connections
-Heavy    = 5-6 connections
-Grand    = 7+ connections
-```
-
-Spell cost:
-
-```text
-spellCost = baseCostForWeight + crossedLineCount * crossedLineEnergyPenalty
-```
-
-Piercing:
-
-```text
-0-1 sharp angles = no shield pierce
-2-3 sharp angles = low shield pierce
-4+ sharp angles  = high shield pierce
-```
-
-Damage priority:
-
-```text
-incoming damage -> piercing bypass -> active shield -> HP -> clamp HP at minHp
-```
-
-Result priority:
-
-- Defeat ends the match when one or both sides reach minimum HP.
-- Simultaneous defeat uses configured tiebreakers.
-- Timer expiry uses HP first, then energy, then draw.
-
-## System Guidance
-
-### Configuration
-
-`src/config.js` is the only place non-coders should need to tune the prototype. Add new constants there first, grouped by domain, with comments and safe ranges.
+Owns frame timing and calls update/render in order. It should pass elapsed time into systems and avoid directly changing HP, cooldowns, or match results.
 
 ### Game State
 
-State should be plain data where possible. Avoid storing Canvas contexts, DOM nodes, timers, or browser-only objects in state. This keeps state easy to reset, inspect, and test.
+Stores current match data:
 
-### Input
+- current screen state
+- match timer
+- countdown value
+- player and AI HP
+- active action states
+- cooldown remaining values
+- latest recognized commands
+- result status
 
-Input modules read keyboard, pointer, touch, and voice events, then emit normalized intents. They must not apply damage, spend energy, pick AI actions, or draw UI.
+Game state should be serializable enough that tests can create and inspect it easily.
 
-### Spell Preparation
+### State Machine
 
-Preparation owns 9-dot point selection, random patterns, name editing, type selection, spell save attempts, loadout validation, and loadout confirmation. Pattern math belongs in spell modules, not render code.
+Use explicit states:
 
-### Combat
+- Boot
+- Countdown
+- Match
+- Pause
+- Result
 
-Combat owns cast validation, energy spend, cooldown starts, damage, shields, healing, slow, utility effects, HP clamps, and result checks. Combat code must not draw Canvas UI.
+Only the active state should process gameplay input. For example, voice commands during Countdown or Result should be ignored or shown as inactive feedback.
+
+### Input Layer
+
+Input systems detect raw input and convert it into normalized command attempts.
+
+Supported prototype inputs:
+
+- microphone voice commands on mobile where available
+- keyboard commands on desktop
+- Canvas-rendered fallback buttons for testing
+
+Input should emit normalized command names only: `Attack`, `Defence`, `Block`, or `Skill`. Input should not apply damage or cooldowns directly.
+
+### Voice Input
+
+Voice recognition must accept only complete valid command words. Partial words must not trigger actions.
+
+The system must provide feedback for:
+
+- recognized valid command
+- unknown command
+- unavailable microphone or permission failure
+- command ignored because the match is not active
+
+For debugging, voice input should log both the raw recognized phrase and the normalized command result.
+
+### Combat Layer
+
+Combat systems own all action execution, cooldown starts, active effect durations, damage resolution, and failed-action reasons.
+
+A command succeeds only when:
+
+- the command is valid
+- the actor is not defeated
+- the match is active
+- the action cooldown is ready
+
+A command fails with one clear reason:
+
+- Unknown Command
+- Cooldown
+- Defeated
+- Match Inactive
+
+### Damage Resolver
+
+Damage must always follow GDD priority:
+
+1. Block prevents all incoming damage.
+2. Defence reduces incoming damage.
+3. Otherwise full damage is applied.
+
+Block takes priority over Defence when both are active.
+
+### Cooldown System
+
+Cooldowns count down during active match time only. Cooldowns should pause when the game is paused or when the match has ended.
+
+Each action has:
+
+- cooldown duration
+- active duration, where relevant
+- current cooldown remaining
+- current active time remaining
+
+### AI Controller
+
+The AI uses the same four actions as the player and follows the same cooldown rules.
+
+The AI attempts one action at a configured interval while the match is active. The AI should prefer Attack when Skill is unavailable and may use Defence or Block in response to player Skill.
+
+AI behavior must be deterministic enough for tests. Any randomness must be injectable or seeded in tests.
+
+### Renderer
+
+Rendering must draw the full game screen inside Canvas:
+
+- arena
+- camera-framed player and opponent sides
+- player silhouettes
+- dragons
+- projectiles or action effects
+- HP bars
+- cooldown indicators
+- state labels
+- latest command text
+- command reference
+- Canvas fallback buttons
+- countdown, pause, and result overlays
+
+Renderers must read layout, colors, fonts, and dimensions from config or layout helpers, not local constants.
+
+### UI and Canvas Buttons
+
+All buttons must be Canvas-rendered interactive regions. Pointer or touch events may come from the Canvas element, but hit detection and button visuals belong to the Canvas UI system.
+
+Fallback buttons must trigger the same normalized commands as voice and keyboard input.
+
+### Asset Layer
+
+Use a manifest-based asset loader. Asset references must be data-driven so placeholder dragons can be replaced without changing combat or rendering code.
+
+Dragon Mania Legends wiki assets may be used only as temporary private prototype placeholders. They must not be treated as licensed assets for public release.
+
+## Full Tunable Config List
+
+The centralized config must include at least these sections and keys.
+
+### App and Canvas
+
+- `canvasWidth`: Width of the playable Canvas. Recommended range: 960–1920.
+- `canvasHeight`: Height of the playable Canvas. Recommended range: 540–1080.
+- `backgroundColor`: Main canvas background color. Use a readable dark or mid-tone value.
+- `targetFrameRate`: Intended frame rate for timing and animation. Recommended range: 30–60.
+- `safeAreaPadding`: Padding from screen edges for HUD elements. Recommended range: 8–48 pixels.
+
+### Match Rules
+
+- `matchDurationSeconds`: Length of a match. Prototype value: 60. Recommended range: 30–90.
+- `countdownSeconds`: Pre-match countdown length. Prototype value: 3. Recommended range: 2–5.
+- `startingHp`: Starting HP for both sides. Prototype value: 100. Recommended range: 50–200.
+- `minHp`: Minimum HP clamp. Prototype value: 0.
+- `drawOnSimultaneousDefeat`: Whether both sides defeated at once creates a draw. Prototype value: true.
+- `timerTieIsDraw`: Whether equal HP at timer end creates a draw. Prototype value: true.
+
+### Actions
+
+- `attackCommandWord`: Full spoken word for Attack. Prototype value: `Attack`.
+- `attackDamage`: Basic Attack damage before mitigation. Prototype value: 10. Recommended range: 5–20.
+- `attackCooldownSeconds`: Cooldown after Attack. Prototype value: 2. Recommended range: 1–4.
+- `attackStateDurationSeconds`: How long the Attack label/animation is shown. Recommended range: 0.3–1.2.
+
+- `defenceCommandWord`: Full spoken word for Defence. Prototype value: `Defence`.
+- `defenceDamageMultiplier`: Incoming damage multiplier while Defence is active. Prototype value: 0.5. Recommended range: 0.25–0.75.
+- `defenceDurationSeconds`: Defence active time. Prototype value: 3. Recommended range: 2–5.
+- `defenceCooldownSeconds`: Cooldown after Defence. Prototype value: 6. Recommended range: 4–10.
+
+- `blockCommandWord`: Full spoken word for Block. Prototype value: `Block`.
+- `blockDamageMultiplier`: Incoming damage multiplier while Block is active. Prototype value: 0.
+- `blockDurationSeconds`: Block active time. Prototype value: 1. Recommended range: 0.5–2.
+- `blockCooldownSeconds`: Cooldown after Block. Prototype value: 5. Recommended range: 3–8.
+
+- `skillCommandWord`: Full spoken word for Skill. Prototype value: `Skill`.
+- `skillDamage`: Skill damage before mitigation. Prototype value: 25. Recommended range: 15–40.
+- `skillCooldownSeconds`: Cooldown after Skill. Prototype value: 10. Recommended range: 7–15.
+- `skillStateDurationSeconds`: How long the Skill label/animation is shown. Recommended range: 0.8–2.
 
 ### AI
 
-AI uses the same spell, energy, cooldown, damage, and result rules as the player. AI decision code may choose an intent, but shared combat code resolves it.
+- `aiActionIntervalSeconds`: Time between AI action attempts. Prototype value: 2. Recommended range: 1.5–4.
+- `aiSkillPreferenceHpThreshold`: Optional HP threshold where AI becomes more likely to use Skill. Recommended range: 20–80.
+- `aiDefensiveReactionWindowSeconds`: Time after player Skill where AI may choose Defence or Block. Recommended range: 0.2–1.
+- `aiAttackWeight`: Relative chance or priority for Attack when no special condition applies.
+- `aiDefenceWeight`: Relative chance or priority for Defence.
+- `aiBlockWeight`: Relative chance or priority for Block.
+- `aiSkillWeight`: Relative chance or priority for Skill when available.
 
-### Rendering
+### Camera and Arena Layout
 
-Rendering receives state and config, then draws. It must not decide gameplay outcomes. Canvas hitboxes come from `ui/layout.js` or equivalent layout helpers.
+- `arenaBounds`: Logical arena rectangle used for layout. Recommended values should fit inside the Canvas safe area.
+- `cameraMode`: Prototype value: behind-right Player 1 framing.
+- `player1Position`: Screen-space anchor for Player 1 silhouette.
+- `player1DragonPosition`: Screen-space anchor for Player 1 dragon.
+- `player2Position`: Screen-space anchor for Player 2 silhouette.
+- `player2DragonPosition`: Screen-space anchor for Player 2 dragon.
+- `dragonScale`: Visual size multiplier for dragons. Recommended range: 0.5–2.
+- `playerSilhouetteScale`: Visual size multiplier for trainer silhouettes. Recommended range: 0.5–1.5.
 
-### Logging
+### HUD and UI Layout
 
-Log through the shared logger with config gates. Required log points:
+- `player1PanelRect`: Position and size of Player 1 status panel.
+- `player2PanelRect`: Position and size of Player 2 status panel.
+- `timerRect`: Position and size of timer/countdown display.
+- `commandReferenceRect`: Position and size of command reference area.
+- `player1CommandRect`: Position and size of Player 1 latest command area.
+- `player2CommandRect`: Position and size of Player 2 latest command area.
+- `fallbackButtonRects`: Canvas button regions for Attack, Defence, Block, and Skill.
+- `stateLabelOffsetY`: Vertical offset for labels above dragons.
+- `hpBarWidth`: Width of HP bars. Recommended range: 120–360 pixels.
+- `hpBarHeight`: Height of HP bars. Recommended range: 8–32 pixels.
+- `cooldownIndicatorSize`: Size of cooldown indicators. Recommended range: 16–64 pixels.
+- `uiFontFamily`: Font family used for Canvas text.
+- `uiFontSizeSmall`: Small UI label size. Recommended range: 12–24.
+- `uiFontSizeMedium`: Main UI label size. Recommended range: 18–36.
+- `uiFontSizeLarge`: Overlay text size. Recommended range: 36–96.
 
-- App boot and state transitions.
-- Pattern created, cleared, randomized, and analyzed.
-- Spell save success or rejection.
-- Loadout confirmation.
-- Raw voice phrase and normalized input.
-- Cast success or failure with reason.
-- Energy spend/regeneration and cooldown updates.
-- Effect application, damage resolution, HP changes, and result selection.
-- AI decisions.
-- Restart, build diagnostics, and server diagnostics.
+### Colors and Feedback
+
+- `colorHpFull`: HP bar filled color.
+- `colorHpEmpty`: HP bar empty/background color.
+- `colorCooldownReady`: Cooldown ready indicator color.
+- `colorCooldownActive`: Cooldown unavailable indicator color.
+- `colorPanelBackground`: HUD panel background color.
+- `colorPanelBorder`: HUD panel border color.
+- `colorTextPrimary`: Main readable text color.
+- `colorTextWarning`: Warning or failed-command text color.
+- `colorAttackEffect`: Attack feedback color.
+- `colorDefenceEffect`: Defence feedback color.
+- `colorBlockEffect`: Block feedback color.
+- `colorSkillEffect`: Skill feedback color.
+- `overlayBackgroundColor`: Full-screen overlay tint color.
+
+### Input
+
+- `validCommands`: List of complete command words accepted by the prototype.
+- `keyboardBindings`: Desktop key bindings for Attack, Defence, Block, and Skill.
+- `enableVoiceInput`: Toggle for microphone voice input.
+- `enableKeyboardInput`: Toggle for desktop keyboard input.
+- `enablePointerButtons`: Toggle for Canvas fallback buttons.
+- `voiceConfidenceThreshold`: Minimum recognition confidence for accepting a spoken command. Recommended range: 0.5–0.95.
+- `unknownCommandDisplaySeconds`: How long failed command feedback stays visible. Recommended range: 1–3.
+
+### Logging and Debug
+
+- `enableDebugLogs`: Toggle for console logs during development.
+- `enableCanvasDebugOverlay`: Toggle for drawing debug hitboxes and layout guides.
+- `logInputEvents`: Toggle for voice, keyboard, and pointer logs.
+- `logCombatEvents`: Toggle for action, damage, cooldown, and defeat logs.
+- `logAiEvents`: Toggle for AI decision logs.
+- `logStateTransitions`: Toggle for screen state transition logs.
+
+## Logging Requirements
+
+Add log messages for essential debugging only. Logs should be clear enough that a non-coder can understand what happened.
+
+Required log points:
+
+- app started
+- assets loaded or failed
+- screen state changed
+- match countdown started
+- match started
+- raw voice phrase received
+- command normalized or rejected
+- command failed and why
+- action executed
+- cooldown started or completed
+- damage applied and final HP
+- AI decision made
+- match ended and result chosen
+- tests or build checks failed during local validation
+
+Logs must be controllable through config toggles.
+
+## Comments for Non-Coders
+
+Add practical comments near important behavior explaining what to modify and where to tune it. Comments should help a designer adjust values safely without reading the whole codebase.
+
+Examples of areas that need comments:
+
+- config sections
+- action definitions
+- AI decision rules
+- damage priority
+- cooldown handling
+- Canvas UI button layout
+- voice command mapping
+
+Avoid noisy comments that restate obvious code.
 
 ## Testing Requirements
 
-Use Node tests for logic-based code. Tests must not require Canvas rendering, real microphone input, browser permissions, network access, or real-time waits.
+Write automated tests for all logic-based code. Tests must not depend on Canvas rendering, real microphone input, or real time passing.
 
-Current coverage should include:
+Required coverage:
 
-- Config shape and required tuning sections.
-- Initial state and state transitions.
-- Canvas layout helper output.
-- Pattern connection count, weight band, crossed lines, closed patterns, piercing, instability, and costs.
-- Spell creation, effect preview, name validation, similar-name rejection, and five-slot loadout confirmation.
-- Prepared spell input mapping.
-- Cast validation failures and success path.
-- Energy spend, shortage, regeneration, and clamp.
-- Spell cooldowns and voice lockouts.
-- Attack, Defense, Support, Control, and Utility effects.
-- Shield and piercing resolution.
-- Timer, defeat, tiebreakers, restart, and return-to-preparation reset.
+- valid command mapping
+- unknown command rejection
+- cooldown success and failure
+- Attack damage
+- Defence damage reduction
+- Block damage prevention
+- Block priority over Defence
+- Skill damage
+- HP clamping at 0
+- simultaneous defeat draw
+- timer win, timer lose, and timer draw
+- AI cannot use actions on cooldown
+- AI cannot act when defeated
+- commands ignored outside active match state
 
-Next coverage should include:
+Update tests for every new feature or design change. Run tests after every development turn.
 
-- AI spell choices using shared rules.
-- AI energy/cooldown management and tactical priorities.
-- Full two-sided match simulations.
+## Build, Diagnostics, and Commit Workflow
 
-## Build, Diagnostics, And Commit Workflow
-
-At the end of every completed request:
+At the end of every implementation request, the developer must:
 
 1. Run the test suite.
-2. Run the local compile/build check.
-3. Fix failing tests or build errors before reporting success.
-4. Verify the local dev server is running; if it is not running, start it.
-5. Report any sandbox limitation that blocks local tests, build, or server diagnostics, and say exactly what should be run locally.
-6. If checks pass, commit all relevant changes with a clear conventional message such as `feat: add spell casting`, `fix: correct shield math`, `chore: update docs`, or `test: cover pattern validation`.
+2. Run a local compile/build check.
+3. Fix any failing tests or build errors before reporting success.
+4. Verify the local dev server is running.
+5. Start the local dev server if it is not running.
+6. Note any sandbox or environment limitation that prevents running the server, tests, or build locally.
+7. If all checks pass, create a Git commit using a clear conventional commit message.
 
-Do not report completion while the build is failing.
+Commit examples:
 
-## Tunable Config Inventory
+- `feat: add voice command combat loop`
+- `fix: correct block damage priority`
+- `test: cover cooldown failure states`
+- `chore: centralize prototype tuning config`
 
-Every item below belongs in `src/config.js` or an equivalent single centralized config export. Each key must be commented with purpose and recommended range. New work should add missing target-combat keys here before using them in code.
+Do not report the work as complete if the build is failing. If the environment prevents validation, clearly say what could not be run and tell the user exactly what to run locally.
 
-### Meta And Diagnostics
+## Implementation Order Guidance
 
-- `meta.title`, `meta.version`
-- `diagnostics.devServerPort`, `diagnostics.buildOutputFolder`, `diagnostics.pagesBranch`
+Build the prototype in layers:
 
-### Logging
+1. Canvas shell, config, state machine, and static screen layout.
+2. Combat command handling, cooldowns, damage, HP, and result rules.
+3. AI opponent decisions and readable state labels.
+4. Voice input plus keyboard and Canvas fallback inputs.
+5. Polished feedback, logs, tests, and diagnostics.
 
-- `logging.enabled`, `logging.prefix`, `logging.verboseFrames`
-- Add category flags as needed: input, spell, combat, AI, state, build, server.
+Each layer should end in a playable or testable result.
 
-### States And Timing
+## Acceptance Criteria
 
-- `states.preparation`, `states.matchPreview`, `states.countdown`, `states.active`, `states.result`
-- `match.durationSeconds`, `match.countdownSeconds`, `match.fightBannerSeconds`
-- Add result delay and restart delay when result flow is implemented.
+The prototype is technically acceptable when:
 
-### Canvas And Page Container
-
-- `canvas.width`, `canvas.height`, `canvas.elementId`, `canvas.cssWidth`, `canvas.cssHeight`, `canvas.pageBackground`
-
-### Colors And Fonts
-
-- `colors.background`, `colors.arenaFar`, `colors.arenaNear`, `colors.arenaLine`
-- `colors.panelFill`, `colors.panelStroke`, `colors.textPrimary`, `colors.textSecondary`
-- `colors.hpFill`, `colors.hpBack`, `colors.cooldownReady`, `colors.cooldownBlocked`
-- `colors.playerDragon`, `colors.aiDragon`, `colors.playerBody`, `colors.aiBody`
-- `colors.skillEffect`, `colors.defenceAura`
-- `colors.warning`, `colors.buttonFill`, `colors.buttonHighlight`, `colors.overlayFill`
-- `fonts.family`, `fonts.overlaySize`, `fonts.largeSize`, `fonts.normalSize`, `fonts.smallSize`, `fonts.buttonSize`, `fonts.boldWeight`, `fonts.normalWeight`
-
-### Match Stats
-
-- `match.startingHp`, `match.minHp`, `match.startingEnergy`, `match.minEnergy`, `match.maxEnergy`, `match.energyRegenPerSecond`, `match.energyDisplayRoundingMode`
-- `match.sideCount`, `match.playerId`, `match.aiId`
-- `match.countdownPhase`, `match.activePhase`, `match.resultPhase`
-- `match.winLabel`, `match.loseLabel`, `match.drawLabel`, `match.restartHint`
-
-### Spell Loadout
-
-- `spells.perLoadout`, `spells.elements`, `spells.defaultFamilies`, `spells.moveNamesByType`, `spells.defaultPlayerNames`, `spells.defaultAiNames`, `spells.types`
-- `spells.minimumNameLength`, `spells.similarNameThreshold`, `spells.nameCycle`
-- `spells.placeholderStatus`, `spells.effectPreviewPlaceholder`
-
-### Pattern Analysis
-
-- `patterns.pointCount`, `patterns.firstPointId`, `patterns.rows`, `patterns.columns`, `patterns.allowReverseDuplicateConnections`
-- `patterns.lightMinConnections`, `patterns.lightMaxConnections`, `patterns.standardMinConnections`, `patterns.standardMaxConnections`
-- `patterns.heavyMinConnections`, `patterns.heavyMaxConnections`, `patterns.grandMinConnections`
-- `patterns.uniquePointsForSecondaryEffect`, `patterns.crossedLineEnergyPenalty`, `patterns.unstableMisfireChance`
-- `patterns.randomMinConnections`, `patterns.randomMaxConnections`, `patterns.randomPointAttemptLimit`
-- `patterns.noPierceMaxSharpAngles`, `patterns.lowPierceMinSharpAngles`, `patterns.lowPierceMaxSharpAngles`, `patterns.highPierceMinSharpAngles`
-- `patterns.lowPiercePercent`, `patterns.highPiercePercent`, `patterns.sharpAngleDotThreshold`, `patterns.percentMultiplier`
-- `patterns.lightLabel`, `patterns.standardLabel`, `patterns.heavyLabel`, `patterns.grandLabel`, `patterns.unformedLabel`
-
-### Spell Costs And Effects
-
-- `spellCosts.Light`, `spellCosts.Standard`, `spellCosts.Heavy`, `spellCosts.Grand`, `spellCosts.Unformed`
-- `spellEffects.attackDamageByWeight.Light`, `spellEffects.attackDamageByWeight.Standard`, `spellEffects.attackDamageByWeight.Heavy`, `spellEffects.attackDamageByWeight.Grand`, `spellEffects.attackDamageByWeight.Unformed`
-- `spellEffects.defenseShieldByWeight.Light`, `spellEffects.defenseShieldByWeight.Standard`, `spellEffects.defenseShieldByWeight.Heavy`, `spellEffects.defenseShieldByWeight.Grand`, `spellEffects.defenseShieldByWeight.Unformed`
-- `spellEffects.supportHealByWeight.Light`, `spellEffects.supportHealByWeight.Standard`, `spellEffects.supportHealByWeight.Heavy`, `spellEffects.supportHealByWeight.Grand`, `spellEffects.supportHealByWeight.Unformed`
-- `spellEffects.controlSlowSecondsByWeight.Light`, `spellEffects.controlSlowSecondsByWeight.Standard`, `spellEffects.controlSlowSecondsByWeight.Heavy`, `spellEffects.controlSlowSecondsByWeight.Grand`, `spellEffects.controlSlowSecondsByWeight.Unformed`
-- `spellEffects.utilityBonusSecondsByWeight.Light`, `spellEffects.utilityBonusSecondsByWeight.Standard`, `spellEffects.utilityBonusSecondsByWeight.Heavy`, `spellEffects.utilityBonusSecondsByWeight.Grand`, `spellEffects.utilityBonusSecondsByWeight.Unformed`
-- `spellEffects.closedAttackBonusDamage`, `spellEffects.closedDefenseBonusShield`, `spellEffects.closedSupportBonusHeal`, `spellEffects.closedControlBonusSeconds`, `spellEffects.closedUtilityBonusSeconds`
-- Add misfire effect modifiers when spell combat is implemented.
-
-### Casting And Cooldowns
-
-- Current keys: `spellCasting.baseCooldownSeconds`, `spellCasting.voiceCooldownMultiplier`, `spellCasting.buttonCooldownMultiplier`, `spellCasting.slowCooldownMultiplier`, `spellCasting.voiceRetryDelaySeconds`, `spellCasting.voiceGlobalLockoutSeconds`, `combat.failedFeedbackSeconds`, `combat.cooldownReadyLabel`, `combat.cooldownDecimalPlaces`
-- Target spell-combat keys to add: inactive-input feedback duration.
-
-### Shield And Damage
-
-- Current keys: `shieldAndDamage.shieldDurationSeconds`, `shieldAndDamage.utilityBonusRegenPerSecond`, `shieldAndDamage.fullDamageMultiplier`, `shieldAndDamage.damageRoundingMode`, `shieldAndDamage.hpRoundingMode`
-- Target spell-combat keys to add: additional shield absorption rules and damage text variants.
-
-### AI
-
-- Current keys: `ai.actionIntervalSeconds`, `ai.defaultSeed`, `ai.waitingLabel`
-- Target spell-combat keys to add: support HP threshold, defensive reaction window, spell type preference weights, AI loadout names.
-
-### Input
-
-- `input.voiceEnabled`, `input.speechLanguage`, `input.voiceUnavailableText`, `input.voiceListeningText`, `input.voiceReadyText`
-- `input.voiceButtonLabel`, `input.restartKey`, `input.voiceKey`, `input.maxTranscriptCharacters`, `input.invalidKeyText`
-- Add voice confidence threshold and microphone mode when the casting pipeline is expanded.
-
-### Preparation Layout
-
-- `layout.eggDrawingX`, `layout.eggDrawingY`, `layout.eggDrawingWidth`, `layout.eggDrawingHeight`
-- `layout.eggGridGap`, `layout.eggGridRows`, `layout.eggGridColumns`, `layout.eggGridPointRadius`
-- `layout.forgePanelX`, `layout.forgePanelY`, `layout.forgePanelWidth`, `layout.forgePanelHeight`
-- `layout.spellSlotsX`, `layout.spellSlotsY`, `layout.spellSlotsWidth`, `layout.spellSlotsHeight`, `layout.spellSlotHeight`, `layout.spellSlotGap`, `layout.deleteSpellButtonWidth`, `layout.deleteSpellButtonHeight`
-- `layout.prepButtonWidth`, `layout.prepButtonHeight`, `layout.spellTypeButtonWidth`, `layout.spellTypeButtonHeight`, `layout.spellTypeButtonGap`, `layout.spellTypeButtonColumns`
-- `layout.spellNameFieldHeight`, `layout.saveSpellButtonWidth`
-
-### Match Layout
-
-- Shared layout: `layout.outerPadding`, `layout.cornerRadius`, `layout.panelLineWidth`, `layout.bottomMargin`, `layout.iconRadius`
-- HUD: `layout.statusPanelWidth`, `layout.statusPanelHeight`, `layout.hpBarHeight`, `layout.hpBarY`, `layout.cooldownChipWidth`, `layout.cooldownChipHeight`, `layout.cooldownChipGap`, `layout.timerPanelWidth`, `layout.timerPanelHeight`, `layout.latestPanelWidth`, `layout.latestPanelHeight`
-- Command panel: `layout.commandPanelWidth`, `layout.commandPanelHeight`
-- Spell buttons and voice: `layout.voiceButtonWidth`, `layout.actionButtonHeight`, `layout.actionButtonY`, `layout.spellButtonWidth`, `layout.spellButtonHeight`, `layout.spellButtonGap`, `layout.spellButtonY`
-- Result controls: `layout.restartButtonWidth`, `layout.overlayButtonHeight`
-- Arena and actors: `layout.horizonY`, `layout.floorBottomY`, `layout.playerHumanX`, `layout.playerHumanY`, `layout.playerDragonX`, `layout.playerDragonY`, `layout.aiHumanX`, `layout.aiHumanY`, `layout.aiDragonX`, `layout.aiDragonY`, `layout.playerDragonWidth`, `layout.playerDragonHeight`, `layout.aiDragonWidth`, `layout.aiDragonHeight`, `layout.humanWidth`, `layout.humanHeight`, `layout.dragonFeatureScale`, `layout.stateLabelOffsetY`
-- Arena bounds and effect placement: `layout.arenaNearLeft`, `layout.arenaNearRight`, `layout.arenaFarLeft`, `layout.arenaFarRight`, `layout.effectArcOffsetY`, `layout.effectLineWidth`
-
-### Animation And Effects
-
-- `animation.hitTextSeconds`, `animation.hitTextRise`, `animation.projectileSeconds`, `animation.shakeSeconds`, `animation.shakePixels`, `animation.dragonBobPixels`, `animation.dragonBobSeconds`
-
-### Text
-
-- Names and identity: `text.playerName`, `text.aiName`, `text.playerElement`, `text.aiElement`
-- Headings: `text.commandReferenceTitle`, `text.preparationTitle`, `text.preparationSubtitle`, `text.eggDrawingTitle`, `text.spellTypeTitle`, `text.spellNameTitle`, `text.effectPreviewTitle`, `text.spellSlotsTitle`, `text.matchPreviewTitle`
-- Buttons: `text.randomPatternLabel`, `text.confirmLoadoutLabel`, `text.saveSpellLabel`, `text.deleteSpellLabel`, `text.cycleNameLabel`, `text.clearPatternLabel`, `text.backToForgeLabel`
-- Feedback: `text.prepReadyFeedback`, `text.spellSavedFeedback`, `text.spellSelectedFeedback`, `text.spellDeletedFeedback`, `text.spellNameRejectedFeedback`, `text.patternRejectedFeedback`, `text.loadoutReadyFeedback`, `text.loadoutBlockedFeedback`
-- HUD and hints: `text.energyLabel`, `text.energyShortLabel`, `text.microphoneStateLabel`, `text.latestPlayerTitle`, `text.latestAiTitle`, `text.noPlayerCommand`, `text.noAiCommand`, `text.fallbackHint`, `text.assetWarning`
-
-## Known Technical Debt
-
-- Match screen still includes preview-state affordances while active spell combat matures.
-- AI is intentionally disabled in the active match loop for Milestone 2 and needs tactical casting in Milestone 3.
-- Renderer is broad and may need splitting when combat visuals grow.
+- all game visuals and UI are rendered inside Canvas
+- the HTML contains no gameplay UI or logic
+- all tunable constants live in the centralized config
+- no gameplay, render, input, or AI file contains magic numbers
+- the player can complete a 60-second match against AI
+- Attack, Defence, Block, and Skill follow the GDD rules exactly
+- cooldowns and state labels are visible and accurate
+- voice, keyboard, and Canvas fallback inputs trigger the same command path
+- failed commands show a clear reason
+- tests cover all logic-based systems
+- the build compiles with no errors
+- the local dev server is verified or the limitation is clearly reported
+- a conventional Git commit is made after passing checks
