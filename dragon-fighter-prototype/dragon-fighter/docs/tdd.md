@@ -2,14 +2,14 @@
 
 ## Current Source
 
-The playable source of truth is now `index.html`, adapted from `voice_command_battle.html`.
+The playable source of truth is now the repository-root `index.html`, adapted from `voice_command_battle.html`.
 It is a standalone browser game that renders the battle and all controls in a Canvas.
 
 The project is intentionally trimmed to:
 
-- `index.html`
-- `docs/`
-- `public/`
+- `/index.html`
+- `dragon-fighter-prototype/dragon-fighter/docs/`
+- `dragon-fighter-prototype/dragon-fighter/public/`
 
 No npm package, build script, module source tree, or test harness is required for the current single-file game.
 
@@ -79,8 +79,8 @@ The game logs key events with the `[VoiceBattle]` prefix:
 
 ## Build
 
-There is no build step. GitHub Pages uploads `dragon-fighter-prototype/dragon-fighter` directly.
-The deployable game entry is `index.html`.
+There is no build step. GitHub Pages uploads the repository root directly.
+The deployable game entry is `/index.html`.
 
 ## Follow-Up Technical Work
 

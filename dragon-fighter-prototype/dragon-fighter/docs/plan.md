@@ -4,12 +4,12 @@
 
 - Replaced the previous playable page with the standalone `voice_command_battle.html` game flow.
 - Cleaned the page text into readable English.
-- Kept the playable source as one Canvas-only HTML game file in `index.html`.
+- Kept the playable source as one Canvas-only HTML game file at repository-root `index.html`.
 - Removed the old npm/module/test/build structure from the game folder.
 - Wired the game to current project assets instead of only drawn placeholder dragons.
 - Added asset fallbacks so the battle still renders if an image fails.
 - Preserved voice commands, Canvas button fallback, keyboard fallback, enemy auto attacks, cooldowns, timer, result flow, and restart.
-- GitHub Pages deploys the static game folder directly.
+- GitHub Pages deploys the repository root directly.
 
 ## Current Playable Scope
 
@@ -24,7 +24,7 @@ The game is a one-screen voice-command dragon battle:
 
 ## Validation Checklist
 
-- Open `index.html` and confirm it shows one Canvas game surface, not a folder listing.
+- Open `/index.html` and confirm it shows one Canvas game surface, not a folder listing.
 - Confirm the arena background loads from `public/assets/backgrounds/arena.png`.
 - Confirm player and enemy dragon images load from `public/assets/dragons/`.
 - Confirm microphone, action, and restart buttons are drawn inside the Canvas.
@@ -35,7 +35,7 @@ The game is a one-screen voice-command dragon battle:
 - Press `A`, `D`, `U`, and `R` and confirm they match the buttons.
 - In a supported browser, start the microphone and say Attack, Defence, or Ultimate.
 - Let the match end and confirm the result overlay appears.
-- Confirm GitHub Pages deploys `dragon-fighter-prototype/dragon-fighter/index.html` directly.
+- Confirm GitHub Pages deploys `/index.html` directly.
 
 ## Next Steps
 
