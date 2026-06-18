@@ -58,8 +58,8 @@
             enemy: "dragon-fighter-prototype/dragon-fighter/public/assets/dragons/moss-boss-dragon-enemy.png"
           },
           facing: {
-            player: { flip: false, direction: "right" },
-            enemy: { flip: true, direction: "left" }
+            player: { flip: true, direction: "left" },
+            enemy: { flip: false, direction: "right" }
           },
           dragons: [
             {
@@ -122,7 +122,7 @@
         };
 
         function getDragonById(config, dragonId) {
-          return config.dragons.find((dragon) => dragon.id === dragonId) || config.dragons[0];
+          return config.dragons.find((dragon) => dragon.id === dragonId) || null;
         }
 
         function getSelectedDragon(config, currentState) {
@@ -132,7 +132,7 @@
         function createInitialState(config) {
           return {
             phase: "select",
-            selectedDragonId: config.dragons[0].id,
+            selectedDragonId: null,
             time: config.matchTime,
             playerHp: config.maxHp,
             enemyHp: config.maxHp,
@@ -245,6 +245,29 @@
           log("reset");
         }
 
+        function chooseDragonAgain() {
+          state.phase = "select";
+          state.selectedDragonId = null;
+          state.time = cfg.matchTime;
+          state.playerHp = cfg.maxHp;
+          state.enemyHp = cfg.maxHp;
+          state.lastHeard = "-";
+          state.accepted = "-";
+          state.playerState = "Choose";
+          state.enemyState = "Ready";
+          state.message = "Choose your dragon.";
+          state.note = "Select a dragon, then confirm to battle.";
+          state.result = "";
+          state.cd.attack = 0;
+          state.cd.defence = 0;
+          state.cd.ultimate = 0;
+          state.defenceTimer = 0;
+          state.enemyTimer = rand(cfg.enemyMinWait, cfg.enemyMaxWait);
+          state.shake = 0;
+          state.particles = [];
+          log("choose_dragon_again");
+        }
+
         function normalize(text) {
           return String(text || "")
             .toLowerCase()
@@ -265,6 +288,10 @@
 
         function confirmDragon() {
           const dragon = core.getSelectedDragon(cfg, state);
+          if (!dragon) {
+            state.note = "Pick a dragon first.";
+            return;
+          }
           state.phase = "playing";
           state.message = `${dragon.name} enters battle.`;
           state.note = "Use canvas buttons, keyboard, or voice commands.";
@@ -274,8 +301,7 @@
         }
 
         function useCommand(cmd, source = "button") {
-          if (state.phase === "select") return;
-          if (state.phase !== "playing") reset();
+          if (state.phase !== "playing") return;
 
           state.accepted = cmd.toUpperCase();
           log("command", { cmd, source });
@@ -364,7 +390,7 @@
         function finish(result) {
           state.phase = "ended";
           state.result = result;
-          state.message = "Press R or Restart to play again.";
+          state.message = "Choose Dragon Again to pick a new dragon.";
           log("finish", { result, playerHp: state.playerHp, enemyHp: state.enemyHp });
         }
 
@@ -480,7 +506,7 @@
         function drawControls() {
           if (state.phase === "select") {
             const select = cfg.dragonSelect;
-            canvasButton("confirmDragon", select.confirm.x, select.confirm.y, select.confirm.w, select.confirm.h, "Confirm Dragon", "#f6c453dd", "#f6c453");
+            canvasButton("confirmDragon", select.confirm.x, select.confirm.y, select.confirm.w, select.confirm.h, "Confirm Dragon", state.selectedDragonId ? "#f6c453dd" : "#475569cc", state.selectedDragonId ? "#f6c453" : "#64748b");
             ctx.textAlign = "center";
             ctx.fillStyle = "#cbd5e1";
             ctx.font = "14px system-ui";
@@ -490,6 +516,16 @@
           }
 
           buttons.length = 0;
+          if (state.phase === "ended") {
+            canvasButton("chooseDragonAgain", 451, 548, 198, 44, "Choose Dragon Again", "#102a4cdd", "#87d5ff");
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#cbd5e1";
+            ctx.font = "14px system-ui";
+            ctx.fillText(state.note, 550, 610);
+            ctx.textAlign = "left";
+            return;
+          }
+
           canvasButton("mic", 110, 548, 150, 44, listening ? "Stop Mic" : "Start Mic", listening ? "#164e35dd" : "#f6c453dd", "#f6c453");
           canvasButton("attack", 286, 548, 120, 44, "Attack", "#402313dd", "#fb923c");
           canvasButton("defence", 432, 548, 120, 44, "Defence", "#16324add", "#60a5fa");
@@ -539,7 +575,7 @@
           });
 
           const selectedDragon = core.getSelectedDragon(cfg, state);
-          state.note = `${selectedDragon.name}: ${selectedDragon.role}`;
+          state.note = selectedDragon ? `${selectedDragon.name}: ${selectedDragon.role}` : state.note;
           drawControls();
           ctx.textAlign = "left";
         }
@@ -755,7 +791,7 @@
             ctx.fillText("Or use canvas buttons / keys A, D, U", 550, 340);
             ctx.fillStyle = "#f6c453";
             ctx.font = "bold 21px system-ui";
-            ctx.fillText("Press R to play again", 550, 385);
+            ctx.fillText("Choose Dragon Again", 550, 385);
             ctx.textAlign = "left";
           }
 
@@ -839,6 +875,7 @@
           if (button.id === "defence") useCommand("defence", "canvas");
           if (button.id === "ultimate") useCommand("ultimate", "canvas");
           if (button.id === "restart") reset();
+          if (button.id === "chooseDragonAgain") chooseDragonAgain();
         });
 
         window.addEventListener("keydown", (e) => {
