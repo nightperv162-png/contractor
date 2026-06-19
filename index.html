@@ -121,8 +121,6 @@
           battleLayout: {
             playerDragon: { x: 360, y: 390, w: 358, h: 253, labelY: 226, hitX: 385, hitY: 370 },
             enemyDragon: { x: 766, y: 312, w: 170, h: 124, labelY: 204, hitX: 750, hitY: 300 },
-            playerSilhouette: { x: 172, y: 425, scale: 1.32, flip: false },
-            enemySilhouette: { x: 908, y: 320, scale: 0.69, flip: true },
             playerHud: { x: 22, y: 12, w: 390, h: 128 },
             enemyHud: { x: 688, y: 12, w: 390, h: 128 },
             timer: { x: 465, y: 18, w: 170, h: 78 },
@@ -673,50 +671,6 @@
           ctx.restore();
         }
 
-        function drawTrainerSilhouette(x, y, scale, flip, coatColor) {
-          ctx.save();
-          ctx.translate(x, y);
-          if (flip) ctx.scale(-1, 1);
-          ctx.scale(scale, scale);
-
-          ctx.fillStyle = "#0006";
-          ctx.beginPath();
-          ctx.ellipse(0, 64, 42, 13, 0, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.strokeStyle = "#020617";
-          ctx.lineWidth = 7;
-          ctx.lineCap = "round";
-          ctx.beginPath();
-          ctx.moveTo(-12, 8);
-          ctx.lineTo(-34, 36);
-          ctx.moveTo(14, 8);
-          ctx.lineTo(36, 32);
-          ctx.moveTo(-8, 42);
-          ctx.lineTo(-22, 66);
-          ctx.moveTo(11, 42);
-          ctx.lineTo(30, 66);
-          ctx.stroke();
-
-          ctx.fillStyle = coatColor;
-          ctx.strokeStyle = "#ffffff26";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.roundRect(-20, -8, 40, 58, 12);
-          ctx.fill();
-          ctx.stroke();
-
-          ctx.fillStyle = "#111827";
-          ctx.beginPath();
-          ctx.arc(0, -26, 17, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#f6c453";
-          ctx.beginPath();
-          ctx.arc(8, -30, 3, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        }
-
         function drawElementIcon(x, y, key) {
           const element = cfg.elements[key] || cfg.elements.enemy;
           ctx.fillStyle = element.color;
@@ -840,9 +794,7 @@
           drawArena();
           const renderData = core.getBattleRenderData(cfg, state);
           const layout = cfg.battleLayout;
-          drawTrainerSilhouette(layout.enemySilhouette.x, layout.enemySilhouette.y, layout.enemySilhouette.scale, layout.enemySilhouette.flip, "#334155");
           drawDragonImage(renderData.enemy.assetKey, layout.enemyDragon.x, layout.enemyDragon.y, layout.enemyDragon.w, layout.enemyDragon.h, renderData.enemy.flip);
-          drawTrainerSilhouette(layout.playerSilhouette.x, layout.playerSilhouette.y, layout.playerSilhouette.scale, layout.playerSilhouette.flip, "#78350f");
           drawDragonImage(renderData.player.assetKey, layout.playerDragon.x, layout.playerDragon.y, layout.playerDragon.w, layout.playerDragon.h, renderData.player.flip);
 
           state.particles.forEach((p) => {
