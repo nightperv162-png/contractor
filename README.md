@@ -41,4 +41,4 @@ Because `index.html` is already at the project root, do not deploy a build folde
 
 ## Live Demo
 
-Live demo URL: `https://<your-github-username>.github.io/<your-repository-name>/`
+Live demo URL: `https://nightperv162-png.github.io/contractor/`
