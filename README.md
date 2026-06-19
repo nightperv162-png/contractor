@@ -1,44 +1,50 @@
-# Dragon Fighter
+# Dragon Contractor
 
-A single-file HTML5 Canvas dragon battle prototype.
+Dragon Contractor is a single-file Canvas HTML game prototype. The playable game is in:
 
-The playable game lives at the repository root in `index.html`. There is no build step and no generated deployment output. GitHub Pages should serve the repository root directly.
+```text
+Dragon Contractor/index.html
+```
+
+No build step is required. The project uses one HTML file with inline CSS and JavaScript, so it can run directly from a static host such as GitHub Pages.
 
 ## Run Locally
 
-Open `index.html` directly in a browser.
-
-For a local static server, run one of these from the repository root:
-
-```bash
-python -m http.server 5174
-```
-
-or:
-
-```bash
-npx serve .
-```
-
-Then open:
+Open this file in a browser:
 
 ```text
-http://localhost:5174/
+Dragon Contractor/index.html
+```
+
+You can also serve the repository with any static server and open:
+
+```text
+http://localhost:8000/Dragon%20Contractor/
+```
+
+For example:
+
+```bash
+python -m http.server 8000
 ```
 
 ## Deploy With GitHub Pages
 
-This project includes `.github/workflows/pages.yml`, which deploys the repository root on pushes to `main`.
+1. Push this repository to GitHub.
+2. Open the repository on GitHub.
+3. Go to `Settings` -> `Pages`.
+4. Set `Source` to deploy from your main branch.
+5. Select the repository root as the Pages source.
+6. Open the game at:
 
-In GitHub:
+```text
+https://<your-github-username>.github.io/<your-repo-name>/Dragon%20Contractor/
+```
 
-1. Go to the repository settings.
-2. Open **Pages**.
-3. Set the source to **GitHub Actions**.
-4. Push to `main`.
-
-Because `index.html` is already at the project root, do not deploy a build folder. The Pages artifact should use the repository root.
+`index.html` is already at the game project root: `Dragon Contractor/index.html`. There is no generated build output to deploy.
 
 ## Live Demo
 
-Live demo URL: `https://nightperv162-png.github.io/contractor/`
+```text
+https://<your-github-username>.github.io/<your-repo-name>/Dragon%20Contractor/
+```

@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dragon Contractor</title>
+    <style>
+      :root { color-scheme: dark; font-family: "Segoe UI", Arial, sans-serif; }
+      * { box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; }
+      body {
+        margin: 0;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: #101116;
+      }
+      canvas {
+        display: block;
+        max-width: 100vw;
+        max-height: 100vh;
+        background: #171923;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="gameCanvas" aria-label="Dragon Contractor canvas game"></canvas>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+
+      const CONFIG = {
+        app: {
+          width: 1280,
+          height: 720,
+          fullCircleRadians: Math.PI * 2
+        },
+        types: ["Damage", "Burst", "Heal", "Energy", "Buff", "Curse", "Vitality"],
+        typeColors: {
+          Damage: "#f0a15f",
+          Burst: "#7fd3ff",
+          Heal: "#72c27a",
+          Energy: "#4ea6c8",
+          Buff: "#e8dca8",
+          Curse: "#9b6ad6",
+          Vitality: "#d78b5f"
+        },
+        dragons: ["Ignivar", "Voltaris", "Mirava", "Zephra", "Orvyn", "Noxar", "Vorn"],
+        traits: ["Fierce", "Ancient", "Swift", "Sealed", "Wild", "Bright", "Grim"],
+        powers: {
+          Damage: ["Flame Bite", "Iron Talon", "Ash Fang"],
+          Burst: ["Thunder Crash", "Meteor Crown", "Rift Roar"],
+          Heal: ["Life Ember", "Mending Breath", "Green Oath"],
+          Energy: ["Mana Breath", "Spark Flow", "Azure Coil"],
+          Buff: ["Dragon Oath", "War Verse", "Crown Mark"],
+          Curse: ["Chain Hex", "Shadow Brand", "Dread Seal"],
+          Vitality: ["Blood Crown", "Heart Bulwark", "Golden Scale"]
+        },
+        base: {
+          Damage: { effect: 12, cost: 10, text: "Damage" },
+          Burst: { effect: 28, cost: 30, text: "Damage" },
+          Heal: { effect: 24, cost: 25, text: "Heal" },
+          Energy: { effect: 30, cost: 0, text: "Energy" },
+          Buff: { effect: 30, cost: 20, text: "Next contract +30%" },
+          Curse: { effect: 30, cost: 20, text: "Enemy next contract -30%" },
+          Vitality: { effect: 50, cost: 25, text: "Max HP" }
+        },
+        drawRect: { x: 70, y: 270, w: 512, h: 280 },
+        analysisRect: { x: 636, y: 150, w: 570, h: 440 },
+        guideRect: { x: 1126, y: 30, w: 92, h: 42 }
+      };
+
+      const W = CONFIG.app.width;
+      const H = CONFIG.app.height;
+      const TAU = CONFIG.app.fullCircleRadians;
+      const keys = new Set();
+
+      const game = {
+        screen: "create",
+        previousScreen: "create",
+        guideOpen: false,
+        message: "Choose a Contract Type, draw a sigil, then save the analysis.",
+        selectedType: "Damage",
+        strokes: [],
+        activeStroke: null,
+        analysis: null,
+        library: [],
+        loadout: [null, null, null, null],
+        callRoll: 0,
+        combat: null,
+        particles: [],
+        buttons: []
+      };
+
+      function fitCanvas() {
+        canvas.width = W;
+        canvas.height = H;
+        const scale = Math.min(window.innerWidth / W, window.innerHeight / H);
+        canvas.style.width = `${W * scale}px`;
+        canvas.style.height = `${H * scale}px`;
+      }
+
+      function pointFromEvent(event) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: (event.clientX - rect.left) * (W / rect.width),
+          y: (event.clientY - rect.top) * (H / rect.height)
+        };
+      }
+
+      function inRect(point, rect) {
+        return point.x >= rect.x && point.x <= rect.x + rect.w && point.y >= rect.y && point.y <= rect.y + rect.h;
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function pick(list, salt = 0) {
+        return list[(Math.floor(Math.random() * list.length) + salt) % list.length];
+      }
+
+      function makeAnalysis() {
+        const points = game.strokes.flat();
+        if (points.length < 6) {
+          game.analysis = null;
+          game.message = "Draw a real sigil first. Empty contracts are rejected.";
+          return;
+        }
+
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        let length = 0;
+        for (const stroke of game.strokes) {
+          for (let i = 0; i < stroke.length; i += 1) {
+            const p = stroke[i];
+            minX = Math.min(minX, p.x);
+            minY = Math.min(minY, p.y);
+            maxX = Math.max(maxX, p.x);
+            maxY = Math.max(maxY, p.y);
+            if (i > 0) length += Math.hypot(p.x - stroke[i - 1].x, p.y - stroke[i - 1].y);
+          }
+        }
+
+        const areaUse = ((maxX - minX) * (maxY - minY)) / (CONFIG.drawRect.w * CONFIG.drawRect.h);
+        const complexity = game.strokes.length + points.length / 22;
+        const completion = Math.min(1, length / 520 + areaUse * 0.45);
+        const grade = completion > 1.05 ? "Perfect" : completion > 0.72 ? "Strong" : completion > 0.42 ? "Stable" : "Rough";
+        const trait = complexity > 7 ? "Ancient" : areaUse > 0.36 ? "Fierce" : game.strokes.length > 2 ? "Sealed" : "Swift";
+        const type = game.selectedType;
+        const dragon = type === "Vitality" ? "Vorn" : pick(CONFIG.dragons);
+        const power = pick(CONFIG.powers[type]);
+        const bonus = grade === "Perfect" ? 1.35 : grade === "Strong" ? 1.2 : grade === "Stable" ? 1.08 : 1;
+        const base = CONFIG.base[type];
+        const value = Math.round(base.effect * bonus);
+        const callWords = [dragon, trait, ...power.split(" ")].filter((word) => !CONFIG.types.includes(word));
+        const callName = callWords[game.callRoll % callWords.length];
+
+        game.analysis = {
+          id: `contract-${Date.now()}-${Math.floor(Math.random() * 9999)}`,
+          dragon,
+          trait,
+          power,
+          type,
+          grade,
+          value,
+          cost: base.cost,
+          callWords,
+          callName,
+          cooldown: 1.5,
+          sigil: game.strokes.map((stroke) => stroke.map((p) => ({ x: p.x, y: p.y }))),
+          why: `${grade} ${trait.toLowerCase()} sigil: ${Math.round(areaUse * 100)}% area, ${game.strokes.length} stroke(s).`
+        };
+        game.message = "Contract analysis ready. Save it or reroll the Call Name.";
+      }
+
+      function saveContract() {
+        if (!game.analysis) {
+          makeAnalysis();
+          return;
+        }
+        game.library.push({ ...game.analysis, cooldownLeft: 0 });
+        autoFillLoadout();
+        game.strokes = [];
+        game.activeStroke = null;
+        game.analysis = null;
+        game.callRoll = 0;
+        game.message = "Contract saved to the library.";
+      }
+
+      function autoFillLoadout() {
+        for (let i = 0; i < game.loadout.length; i += 1) {
+          if (!game.loadout[i] && game.library[i]) game.loadout[i] = game.library[i].id;
+        }
+      }
+
+      function equippedContracts() {
+        return game.loadout.map((id) => game.library.find((contract) => contract.id === id) || null);
+      }
+
+      function startCombat() {
+        autoFillLoadout();
+        if (equippedContracts().every((contract) => !contract)) {
+          game.screen = "create";
+          game.message = "Create and save at least one contract before combat.";
+          return;
+        }
+        game.screen = "combat";
+        game.combat = {
+          timer: 60,
+          player: { hp: 200, hpMax: 200, energy: 100, buff: 0, vitality: 0 },
+          enemy: { hp: 200, hpMax: 200, energy: 100, curse: 0 },
+          aiTimer: 1.5,
+          latestPlayer: "None",
+          latestEnemy: "Waiting",
+          result: null
+        };
+        game.library.forEach((contract) => {
+          contract.cooldownLeft = 0;
+        });
+        game.message = "Combat started. Use 1-4 to invoke Call Names.";
+      }
+
+      function castSlot(index) {
+        if (game.screen !== "combat" || !game.combat || game.combat.result) return;
+        const contract = equippedContracts()[index];
+        if (!contract) {
+          game.message = "Empty slot.";
+          return;
+        }
+        invokeContract(contract, "player");
+      }
+
+      function invokeContract(contract, actor) {
+        const c = game.combat;
+        const source = actor === "player" ? c.player : c.enemy;
+        const target = actor === "player" ? c.enemy : c.player;
+        if (contract.cooldownLeft > 0) {
+          if (actor === "player") game.message = "Contract Cooldown.";
+          return;
+        }
+        if (source.energy < contract.cost) {
+          if (actor === "player") game.message = "Not Enough Energy.";
+          return;
+        }
+
+        source.energy -= contract.cost;
+        contract.cooldownLeft = contract.cooldown;
+        let value = contract.value;
+        if (source.buff > 0 && contract.type !== "Buff") {
+          value = Math.round(value * 1.3);
+          source.buff -= 1;
+        }
+        if (target.curse > 0 && ["Damage", "Burst"].includes(contract.type)) {
+          value = Math.round(value * 0.7);
+          target.curse -= 1;
+        }
+        value = Math.min(value, contract.type === "Burst" ? 40 : value);
+
+        if (contract.type === "Damage" || contract.type === "Burst") target.hp = clamp(target.hp - value, 0, target.hpMax);
+        if (contract.type === "Heal") source.hp = clamp(source.hp + value, 0, source.hpMax);
+        if (contract.type === "Energy") source.energy = clamp(source.energy + value, 0, 100);
+        if (contract.type === "Buff") source.buff = 2;
+        if (contract.type === "Curse") target.curse = 1;
+        if (contract.type === "Vitality") {
+          source.hpMax = clamp(200 + value, 200, 300);
+          source.hp = clamp(source.hp + value, 0, source.hpMax);
+          source.vitality = 8;
+        }
+
+        addSigilFlash(contract, actor);
+        const line = `${contract.callName}: ${contract.type}`;
+        if (actor === "player") c.latestPlayer = line;
+        else c.latestEnemy = line;
+        game.message = actor === "player" ? `You invoked ${line}.` : `Enemy invoked ${line}.`;
+        chooseResult();
+      }
+
+      function addSigilFlash(contract, actor) {
+        const x = actor === "player" ? 320 : 930;
+        const y = 350;
+        game.particles.push({ kind: "sigil", x, y, life: 0.55, color: CONFIG.typeColors[contract.type], sigil: contract.sigil });
+      }
+
+      function update(dt) {
+        for (const particle of game.particles) particle.life -= dt;
+        game.particles = game.particles.filter((particle) => particle.life > 0);
+        if (game.screen !== "combat" || !game.combat || game.guideOpen || game.combat.result) return;
+
+        const c = game.combat;
+        c.timer = Math.max(0, c.timer - dt);
+        c.player.energy = clamp(c.player.energy + 10 * dt, 0, 100);
+        c.enemy.energy = clamp(c.enemy.energy + 8 * dt, 0, 100);
+        for (const contract of game.library) contract.cooldownLeft = Math.max(0, contract.cooldownLeft - dt);
+
+        if (c.player.vitality > 0) {
+          c.player.vitality -= dt;
+          if (c.player.vitality <= 0) {
+            c.player.hpMax = 200;
+            c.player.hp = clamp(c.player.hp, 0, 200);
+          }
+        }
+
+        c.aiTimer -= dt;
+        if (c.aiTimer <= 0) {
+          c.aiTimer = 1.4 + Math.random() * 1.1;
+          const options = equippedContracts().filter((contract) => contract && contract.cooldownLeft <= 0 && c.enemy.energy >= contract.cost);
+          if (options.length) invokeContract(pick(options), "enemy");
+        }
+        chooseResult();
+      }
+
+      function chooseResult() {
+        const c = game.combat;
+        if (!c || c.result) return;
+        if (c.player.hp <= 0 && c.enemy.hp <= 0) c.result = "Draw";
+        else if (c.enemy.hp <= 0) c.result = "Win";
+        else if (c.player.hp <= 0) c.result = "Lose";
+        else if (c.timer <= 0) c.result = c.player.hp === c.enemy.hp ? "Draw" : c.player.hp > c.enemy.hp ? "Win" : "Lose";
+        if (c.result) game.message = `Result: ${c.result}. Press R to restart creation.`;
+      }
+
+      function draw() {
+        game.buttons = [];
+        drawBackground();
+        drawTopBar();
+        if (game.screen === "create") drawCreation();
+        if (game.screen === "loadout") drawLoadout();
+        if (game.screen === "combat") drawCombat();
+        drawParticles();
+        drawMessage();
+        if (game.guideOpen) drawGuide();
+      }
+
+      function drawBackground() {
+        const gradient = ctx.createLinearGradient(0, 0, W, H);
+        gradient.addColorStop(0, "#171923");
+        gradient.addColorStop(0.56, "#20262a");
+        gradient.addColorStop(1, "#281d22");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = "rgba(232, 220, 168, 0.07)";
+        for (let x = -100; x < W; x += 48) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x + 130, H);
+          ctx.stroke();
+        }
+      }
+
+      function drawTopBar() {
+        ctx.fillStyle = "rgba(35, 38, 45, 0.92)";
+        roundRect(32, 22, 1216, 72, 8, true, false);
+        ctx.strokeStyle = "#68707a";
+        roundRect(32, 22, 1216, 72, 8, false, true);
+        drawText("Dragon Contractor", 58, 42, 30, "#f3f4ea", "left", "700");
+        drawText(`Phase: ${phaseName()}`, 58, 72, 14, "#b8c0b0");
+        button("Create", 660, 38, 112, 40, () => { game.screen = "create"; });
+        button("Loadout", 786, 38, 112, 40, () => { autoFillLoadout(); game.screen = "loadout"; });
+        button("Combat", 912, 38, 112, 40, startCombat);
+        button("Guide", CONFIG.guideRect.x, CONFIG.guideRect.y, CONFIG.guideRect.w, CONFIG.guideRect.h, () => {
+          game.guideOpen = true;
+          game.previousScreen = game.screen;
+        });
+      }
+
+      function phaseName() {
+        if (game.screen === "create") return "Contract Creation";
+        if (game.screen === "loadout") return "Loadout Preparation";
+        return "Combat";
+      }
+
+      function drawCreation() {
+        drawText("1. Choose Contract Type", 70, 124, 22, "#f3f4ea", "left", "700");
+        CONFIG.types.forEach((type, index) => {
+          const x = 70 + (index % 4) * 126;
+          const y = index < 4 ? 150 : 196;
+          button(type, x, y, 112, 38, () => {
+            game.selectedType = type;
+            game.analysis = null;
+            game.message = `${type} selected. Draw a sigil for this contract.`;
+          }, type === game.selectedType ? CONFIG.typeColors[type] : "#2e323b");
+        });
+
+        drawText("2. Draw Sigil", CONFIG.drawRect.x, CONFIG.drawRect.y - 18, 22, "#f3f4ea", "left", "700");
+        ctx.fillStyle = "#12141a";
+        roundRect(CONFIG.drawRect.x, CONFIG.drawRect.y, CONFIG.drawRect.w, CONFIG.drawRect.h, 8, true, false);
+        ctx.strokeStyle = CONFIG.typeColors[game.selectedType];
+        ctx.lineWidth = 2;
+        roundRect(CONFIG.drawRect.x, CONFIG.drawRect.y, CONFIG.drawRect.w, CONFIG.drawRect.h, 8, false, true);
+        drawText("Draw here with mouse or touch", CONFIG.drawRect.x + CONFIG.drawRect.w / 2, CONFIG.drawRect.y + CONFIG.drawRect.h / 2 - 10, 18, "#68707a", "center");
+        drawStoredSigil(game.strokes, 0, 0, 1, CONFIG.typeColors[game.selectedType], 1);
+
+        button("Analyze", 70, 586, 118, 38, makeAnalysis);
+        button("Redraw", 202, 586, 118, 38, () => {
+          game.strokes = [];
+          game.activeStroke = null;
+          game.analysis = null;
+          game.message = "Drawing cleared.";
+        });
+
+        drawAnalysisPanel();
+      }
+
+      function drawAnalysisPanel() {
+        const r = CONFIG.analysisRect;
+        ctx.fillStyle = "rgba(35, 38, 45, 0.94)";
+        roundRect(r.x, r.y, r.w, r.h, 8, true, false);
+        ctx.strokeStyle = "#68707a";
+        roundRect(r.x, r.y, r.w, r.h, 8, false, true);
+        drawText("3. Contract Analysis", r.x + 28, r.y + 34, 28, "#f3f4ea", "left", "700");
+        if (!game.analysis) {
+          drawText("No analysis yet.", r.x + 28, r.y + 94, 20, "#b8c0b0");
+          drawText("Pick a Contract Type, draw a mark, then press Analyze.", r.x + 28, r.y + 126, 17, "#b8c0b0");
+          return;
+        }
+        const a = game.analysis;
+        let y = r.y + 90;
+        drawText("Dragon - Trait - Power:", r.x + 28, y, 17, "#e8dca8", "left", "700"); y += 28;
+        drawText(`${a.dragon} - ${a.trait} - ${a.power}`, r.x + 28, y, 23, "#f3f4ea", "left", "700"); y += 48;
+        drawText("Contract Call:", r.x + 28, y, 17, "#e8dca8", "left", "700");
+        drawText(`[${a.callName}]`, r.x + 178, y - 3, 23, CONFIG.typeColors[a.type], "left", "700");
+        button("Reroll", r.x + 388, y - 16, 112, 38, () => {
+          game.callRoll += 1;
+          makeAnalysis();
+        }); y += 48;
+        drawText("Must be one word from this contract.", r.x + 28, y, 15, "#b8c0b0"); y += 36;
+        drawText(`Effect: ${effectText(a)}`, r.x + 28, y, 20, "#f3f4ea"); y += 34;
+        drawText(`Cost: ${a.cost} Energy`, r.x + 28, y, 20, "#f3f4ea"); y += 34;
+        drawText(`Cooldown: ${a.cooldown}s`, r.x + 28, y, 20, "#f3f4ea"); y += 34;
+        drawText(`Grade: ${a.grade}`, r.x + 28, y, 20, "#f3f4ea"); y += 34;
+        drawText(`Why: ${a.why}`, r.x + 28, y, 16, "#b8c0b0");
+        button("Save Contract", r.x + 28, r.y + r.h - 66, 170, 44, saveContract, "#5fb3a1");
+        button("Go Loadout", r.x + 216, r.y + r.h - 66, 154, 44, () => {
+          autoFillLoadout();
+          game.screen = "loadout";
+        });
+      }
+
+      function drawLoadout() {
+        drawText("Contract Library", 70, 132, 28, "#f3f4ea", "left", "700");
+        if (!game.library.length) {
+          drawText("No contracts yet. Return to Contract Creation and save one.", 70, 190, 20, "#b8c0b0");
+          button("Create Contract", 70, 230, 184, 44, () => { game.screen = "create"; }, "#5fb3a1");
+        }
+        game.library.forEach((contract, index) => {
+          const x = 70;
+          const y = 180 + index * 76;
+          contractCard(contract, x, y, 490, 62);
+          button("Equip", 580, y + 10, 92, 38, () => {
+            const empty = game.loadout.findIndex((id) => !id);
+            game.loadout[empty === -1 ? 0 : empty] = contract.id;
+            game.message = `${contract.fullName || fullName(contract)} equipped.`;
+          });
+        });
+
+        drawText("Battle Slots", 760, 132, 28, "#f3f4ea", "left", "700");
+        equippedContracts().forEach((contract, index) => {
+          const y = 180 + index * 92;
+          ctx.fillStyle = "rgba(35, 38, 45, 0.94)";
+          roundRect(760, y, 410, 72, 8, true, false);
+          ctx.strokeStyle = contract ? CONFIG.typeColors[contract.type] : "#68707a";
+          roundRect(760, y, 410, 72, 8, false, true);
+          drawText(`[${index + 1}]`, 784, y + 28, 22, "#e8dca8", "left", "700");
+          if (contract) {
+            drawText(contract.callName, 840, y + 18, 26, "#f3f4ea", "left", "700");
+            drawText(`${contract.type} | ${effectText(contract)} | ${contract.cost} Energy`, 840, y + 48, 15, "#b8c0b0");
+          } else {
+            drawText("Empty Slot", 840, y + 28, 20, "#68707a");
+          }
+          button("Clear", 1084, y + 18, 68, 36, () => { game.loadout[index] = null; });
+        });
+        button("Start Combat", 946, 582, 224, 54, startCombat, "#5fb3a1");
+      }
+
+      function drawCombat() {
+        const c = game.combat;
+        if (!c) {
+          startCombat();
+          return;
+        }
+        drawText("Contract Duel", 70, 128, 28, "#f3f4ea", "left", "700");
+        drawCombatant("Contractor", 88, 172, c.player, "#5fb3a1");
+        drawCombatant("Enemy", 844, 172, c.enemy, "#d78b5f");
+        drawText(Math.ceil(c.timer).toString(), W / 2, 150, 52, "#f3f4ea", "center", "700");
+        drawScrollContractor(290, 352);
+        drawEnemyDragon(940, 348);
+
+        drawText(`Latest Player Call: ${c.latestPlayer}`, 70, 500, 18, "#b8c0b0");
+        drawText(`Latest Enemy Call: ${c.latestEnemy}`, 782, 500, 18, "#b8c0b0");
+        equippedContracts().forEach((contract, index) => {
+          const x = 70 + index * 300;
+          const y = 558;
+          ctx.fillStyle = "rgba(35, 38, 45, 0.96)";
+          roundRect(x, y, 260, 74, 8, true, false);
+          ctx.strokeStyle = contract ? CONFIG.typeColors[contract.type] : "#68707a";
+          roundRect(x, y, 260, 74, 8, false, true);
+          if (contract) {
+            drawText(`[${index + 1}] ${contract.callName}`, x + 18, y + 28, 23, "#f3f4ea", "left", "700");
+            drawText(`${contract.type} | ${contract.cost} Energy`, x + 18, y + 55, 14, "#b8c0b0");
+            if (contract.cooldownLeft > 0) {
+              ctx.fillStyle = "rgba(5, 7, 10, 0.62)";
+              roundRect(x, y, 260 * (contract.cooldownLeft / contract.cooldown), 74, 8, true, false);
+              drawText(contract.cooldownLeft.toFixed(1), x + 226, y + 44, 18, "#e8dca8", "center", "700");
+            }
+          } else {
+            drawText(`[${index + 1}] Empty`, x + 18, y + 42, 20, "#68707a");
+          }
+        });
+        if (c.result) drawResult(c.result);
+      }
+
+      function drawCombatant(label, x, y, actor, color) {
+        drawText(label, x, y, 18, "#f3f4ea", "left", "700");
+        bar(x, y + 18, 330, 22, actor.hp / actor.hpMax, "#c94f5d");
+        bar(x, y + 52, 330, 16, actor.energy / 100, "#4ea6c8");
+        drawText(`${Math.ceil(actor.hp)}/${actor.hpMax} HP`, x + 342, y + 36, 15, color);
+        drawText(`${Math.floor(actor.energy)} Energy`, x + 342, y + 70, 15, "#b8c0b0");
+      }
+
+      function drawScrollContractor(x, y) {
+        ctx.fillStyle = "#e8dca8";
+        ctx.beginPath();
+        ctx.arc(x, y - 54, 22, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = "#2e323b";
+        ctx.beginPath();
+        ctx.moveTo(x, y - 30);
+        ctx.lineTo(x - 50, y + 82);
+        ctx.lineTo(x + 48, y + 82);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#d8c48d";
+        roundRect(x + 24, y - 4, 82, 34, 5, true, false);
+        ctx.strokeStyle = "#d78b5f";
+        roundRect(x + 24, y - 4, 82, 34, 5, false, true);
+      }
+
+      function drawEnemyDragon(x, y) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = "#8c4355";
+        ctx.beginPath();
+        ctx.moveTo(-80, 22);
+        ctx.quadraticCurveTo(-30, -88, 66, -32);
+        ctx.quadraticCurveTo(112, 8, 70, 70);
+        ctx.quadraticCurveTo(0, 92, -80, 22);
+        ctx.fill();
+        ctx.fillStyle = "#f3f4ea";
+        ctx.beginPath();
+        ctx.arc(42, -18, 7, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawResult(result) {
+        ctx.fillStyle = "rgba(5, 7, 10, 0.78)";
+        ctx.fillRect(0, 0, W, H);
+        drawText(result, W / 2, 292, 64, "#f3f4ea", "center", "700");
+        drawText("Press R to restart at Contract Creation.", W / 2, 344, 22, "#b8c0b0", "center");
+        button("Return to Loadout", W / 2 - 112, 386, 224, 52, () => { game.screen = "loadout"; game.combat = null; }, "#5fb3a1");
+      }
+
+      function drawGuide() {
+        game.buttons = [];
+        ctx.fillStyle = "rgba(5, 7, 10, 0.82)";
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "#23262d";
+        roundRect(250, 145, 780, 430, 8, true, false);
+        ctx.strokeStyle = "#5fb3a1";
+        roundRect(250, 145, 780, 430, 8, false, true);
+        const lines = guideLines();
+        drawText(`${phaseName()} Guide`, 292, 196, 32, "#f3f4ea", "left", "700");
+        lines.forEach((line, index) => drawText(line, 292, 260 + index * 36, 20, "#b8c0b0"));
+        button("Close", 566, 500, 148, 46, () => { game.guideOpen = false; }, "#5fb3a1");
+      }
+
+      function guideLines() {
+        if (game.screen === "create") return [
+          "Choose a Contract Type, then draw inside the sigil box.",
+          "Analyze turns your drawing into Dragon, Trait, Power, Grade, and Call Name.",
+          "Reroll changes the short Call Name. Save puts the contract in your Library."
+        ];
+        if (game.screen === "loadout") return [
+          "Equip saved contracts into the four battle slots.",
+          "The big word in each slot is the Call Name used during combat.",
+          "Use Start Combat when your loadout has at least one contract."
+        ];
+        return [
+          "Press 1-4 to invoke equipped contracts by slot.",
+          "HP, Energy, cooldowns, Buff, Curse, Heal, Energy, and Vitality update in combat.",
+          "Opening Guide pauses the combat timer."
+        ];
+      }
+
+      function drawParticles() {
+        for (const particle of game.particles) {
+          if (particle.kind !== "sigil") continue;
+          ctx.save();
+          ctx.globalAlpha = clamp(particle.life * 2, 0, 1);
+          ctx.translate(particle.x, particle.y);
+          const scale = 0.34 + (0.55 - particle.life) * 0.4;
+          drawStoredSigil(particle.sigil, -CONFIG.drawRect.x * scale, -CONFIG.drawRect.y * scale, scale, particle.color, 1);
+          ctx.restore();
+        }
+      }
+
+      function drawStoredSigil(strokes, ox, oy, scale, color, alpha) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(2, 4 * scale);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        for (const stroke of strokes) {
+          if (stroke.length < 2) continue;
+          ctx.beginPath();
+          ctx.moveTo(ox + stroke[0].x * scale, oy + stroke[0].y * scale);
+          for (let i = 1; i < stroke.length; i += 1) ctx.lineTo(ox + stroke[i].x * scale, oy + stroke[i].y * scale);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function contractCard(contract, x, y, w, h) {
+        ctx.fillStyle = "rgba(35, 38, 45, 0.94)";
+        roundRect(x, y, w, h, 8, true, false);
+        ctx.strokeStyle = CONFIG.typeColors[contract.type];
+        roundRect(x, y, w, h, 8, false, true);
+        drawText(fullName(contract), x + 16, y + 24, 18, "#f3f4ea", "left", "700");
+        drawText(`${contract.type} | Call: ${contract.callName} | ${effectText(contract)} | ${contract.cost} Energy`, x + 16, y + 48, 14, "#b8c0b0");
+      }
+
+      function fullName(contract) {
+        return `${contract.dragon}'s ${contract.power}`;
+      }
+
+      function effectText(contract) {
+        if (contract.type === "Damage" || contract.type === "Burst") return `${contract.value} Damage`;
+        if (contract.type === "Heal") return `Restore ${contract.value} HP`;
+        if (contract.type === "Energy") return `Restore ${contract.value} Energy`;
+        if (contract.type === "Vitality") return `+${contract.value} Max HP`;
+        return CONFIG.base[contract.type].text;
+      }
+
+      function drawMessage() {
+        drawText(game.message, 40, 696, 16, "#e8dca8");
+      }
+
+      function button(label, x, y, w, h, action, fill = "#2e323b") {
+        ctx.fillStyle = fill;
+        roundRect(x, y, w, h, 8, true, false);
+        ctx.strokeStyle = "#68707a";
+        roundRect(x, y, w, h, 8, false, true);
+        drawText(label, x + w / 2, y + h / 2 + 1, 15, fill === "#5fb3a1" ? "#101116" : "#f3f4ea", "center", "700", "middle");
+        game.buttons.push({ x, y, w, h, action });
+      }
+
+      function bar(x, y, w, h, ratio, color) {
+        ctx.fillStyle = "#2e323b";
+        roundRect(x, y, w, h, 7, true, false);
+        ctx.fillStyle = color;
+        roundRect(x, y, w * clamp(ratio, 0, 1), h, 7, true, false);
+        ctx.strokeStyle = "#68707a";
+        roundRect(x, y, w, h, 7, false, true);
+      }
+
+      function drawText(text, x, y, size, color, align = "left", weight = "400", baseline = "alphabetic") {
+        ctx.fillStyle = color;
+        ctx.font = `${weight} ${size}px Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = align;
+        ctx.textBaseline = baseline;
+        ctx.fillText(text, x, y);
+        ctx.textBaseline = "alphabetic";
+      }
+
+      function roundRect(x, y, w, h, r, fill, stroke) {
+        const radius = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.arcTo(x + w, y, x + w, y + h, radius);
+        ctx.arcTo(x + w, y + h, x, y + h, radius);
+        ctx.arcTo(x, y + h, x, y, radius);
+        ctx.arcTo(x, y, x + radius, y, radius);
+        ctx.closePath();
+        if (fill) ctx.fill();
+        if (stroke) ctx.stroke();
+      }
+
+      canvas.addEventListener("pointerdown", (event) => {
+        const p = pointFromEvent(event);
+        for (let i = game.buttons.length - 1; i >= 0; i -= 1) {
+          if (inRect(p, game.buttons[i])) {
+            game.buttons[i].action();
+            return;
+          }
+        }
+        if (game.screen === "create" && !game.guideOpen && inRect(p, CONFIG.drawRect)) {
+          game.activeStroke = [p];
+          game.strokes.push(game.activeStroke);
+          game.analysis = null;
+        }
+      });
+
+      canvas.addEventListener("pointermove", (event) => {
+        if (!game.activeStroke) return;
+        const p = pointFromEvent(event);
+        if (inRect(p, CONFIG.drawRect)) game.activeStroke.push(p);
+      });
+
+      window.addEventListener("pointerup", () => {
+        game.activeStroke = null;
+      });
+
+      window.addEventListener("keydown", (event) => {
+        const key = event.key.toLowerCase();
+        keys.add(key);
+        if (["1", "2", "3", "4"].includes(key)) castSlot(Number(key) - 1);
+        if (key === "r") {
+          game.screen = "create";
+          game.combat = null;
+          game.message = "Restarted at Contract Creation.";
+        }
+        if (key === "g") game.guideOpen = !game.guideOpen;
+      });
+      window.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
+      window.addEventListener("resize", fitCanvas);
+
+      let last = performance.now();
+      function loop(now) {
+        const dt = Math.min(0.033, (now - last) / 1000);
+        last = now;
+        update(dt);
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      fitCanvas();
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>
