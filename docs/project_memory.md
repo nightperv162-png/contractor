@@ -1,0 +1,29 @@
+# Project Memory
+
+## Stable Facts
+- Project name: Dragon Contractor.
+- Repository root: `D:\for code\contractor`.
+- GitHub remote: `https://github.com/nightperv162-png/contractor.git`.
+- GitHub default branch is `main`.
+- Current deployment work uses `main`; an earlier local branch was `master`.
+- The deployable game entrypoint is `index.html` at the repository root.
+- The game is a single-file HTML5 Canvas project with inline CSS and JavaScript.
+- There is no build step and no generated build output to deploy.
+- GitHub Pages should deploy the repository root.
+- Earlier local project folder was `Dragon Contractor`; before that, the tracked folder was `Dragon tractor`.
+- Commit `d68abae chore: rename project folder` recorded the rename from `Dragon tractor` to `Dragon Contractor`.
+- Earlier comparison found `origin/main` had a different Dragon Fighter tree before the Dragon Contractor project was restored onto `main`.
+
+## Terminology
+- Contract: a player-created ability generated from a drawn sigil.
+- Call Name: the one-word invocation used for a saved contract.
+- Loadout: the equipped contract slots used in combat.
+
+## Decisions
+- Keep gameplay logic unchanged unless a deployment issue requires it.
+- Use relative/static-compatible paths for any future assets.
+- Keep GitHub Pages deployment simple: root `index.html`, `.nojekyll`, and GitHub Actions Pages workflow.
+- Root `/docs` memory files are the canonical task-memory location for this repository.
+- Do not force-update GitHub `main` without explicit user approval when branch trees differ.
+- Generated build output such as `dist` should not be staged unless deployment explicitly requires it.
+- Project design documents from nested `Dragon Contractor/docs/` were consolidated into root `docs/`.
