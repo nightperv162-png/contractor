@@ -4,7 +4,7 @@
 Prepare and verify the HTML game project for GitHub Pages deployment while keeping canonical Markdown documentation at root `docs/`.
 
 ## Current Task
-Verify the static GitHub Pages deployment shape after docs consolidation.
+Commit and push the documentation consolidation and deployment verification work to GitHub.
 
 ## Completed Steps
 - Read root `docs/project_memory.md`, `docs/agent_state.md`, and `docs/work_log.md` before working.
@@ -16,9 +16,11 @@ Verify the static GitHub Pages deployment shape after docs consolidation.
 - Checked for duplicate generated folders such as `dist`, `build`, and `node_modules`; none were found.
 - Confirmed the old nested `Dragon Contractor` folder no longer exists.
 - Ran a Node syntax check against the inline script in root `index.html`; it compiled successfully.
+- Committed documentation consolidation as `6081a71 docs: consolidate project documentation`.
+- Pushed `main` to `https://github.com/nightperv162-png/contractor.git`.
 
 ## Next Action
-Review `git status` and commit the staged documentation consolidation plus deployment verification notes if the changed-file list is correct.
+Check the GitHub Pages Actions run and live Pages URL after GitHub finishes deploying.
 
 ## Blockers
 - None.

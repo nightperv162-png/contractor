@@ -28,3 +28,6 @@
 - Checked for generated duplicate folders such as `dist`, `build`, and `node_modules`; none were found.
 - Confirmed old nested `Dragon Contractor` folder no longer exists.
 - Ran Node inline-script syntax check for `index.html`; one script compiled successfully.
+- Committed staged documentation consolidation as `6081a71 docs: consolidate project documentation`.
+- Pushed `main` to `https://github.com/nightperv162-png/contractor.git`.
+- Updated `docs/agent_state.md` after push so the next action points to checking the GitHub Pages deployment result.
