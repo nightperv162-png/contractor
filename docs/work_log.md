@@ -46,3 +46,9 @@
 - Verified inline JavaScript compilation, `git diff --check`, and local HTTP 200 at `http://127.0.0.1:8000/`.
 - In-app rendered verification was unavailable in this session.
 - Committed the verified game-flow, tests, and compact agent documentation on `main`.
+- Added Canvas-only Chaos, Order, and Balance Contract Creation modes using the existing creation/save/combat flow.
+- Added shared geometry and stat analysis in `src/contract-creation.js`, driven by `CONFIG.creation` tuning.
+- Added Order typed octagon points, reversed-edge rejection, path breaks, Balance symmetry axes, and dashed drawing support.
+- Added 15 requested creation-analysis tests plus a Canvas render smoke test; all 22 project tests pass.
+- Verified JavaScript compilation, local page/module HTTP 200 responses, and `git diff --check`; in-app rendered verification was unavailable.
+- Committed the verified Contract Creation modes, shared analyzer, tests, and documentation on `main`.

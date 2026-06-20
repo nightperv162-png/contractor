@@ -6,6 +6,7 @@ const vm = require("node:vm");
 function loadGame() {
   const html = fs.readFileSync("index.html", "utf8");
   const source = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const ContractCreation = require("../src/contract-creation.js");
   const context2d = new Proxy({}, {
     get(target, property) {
       if (property === "createLinearGradient") return () => ({ addColorStop() {} });
@@ -25,6 +26,7 @@ function loadGame() {
   };
   const window = {
     addEventListener() {},
+    ContractCreation,
     innerHeight: 720,
     innerWidth: 1280
   };

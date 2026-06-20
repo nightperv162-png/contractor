@@ -26,9 +26,11 @@
   <body>
     <canvas id="gameCanvas" aria-label="Dragon Contractor canvas game"></canvas>
 
+    <script src="./src/contract-creation.js"></script>
     <script>
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
+      const Creation = window.ContractCreation;
 
       const CONFIG = {
         app: {
@@ -104,7 +106,85 @@
             cooldown: 3
           }
         ],
-        drawRect: { x: 70, y: 270, w: 512, h: 280 },
+        creation: {
+          defaultMode: "chaos",
+          modes: {
+            chaos: { label: "Chaos Contract Creation", shortLabel: "Chaos" },
+            order: { label: "Order Contract Creation", shortLabel: "Order" },
+            balance: { label: "Balance Contract Creation", shortLabel: "Balance" }
+          },
+          minimumAnalysisPoints: 2,
+          modeButtons: { x: 70, y: 146, width: 156, height: 38, gap: 12 },
+          typeButtons: { x: 70, firstY: 220, secondY: 260, width: 112, height: 34, gap: 14, columns: 4 },
+          labels: { modeTitleY: 126, typeTitleY: 204, drawingTitleY: 316, statusY: 238 },
+          actions: { y: 590, analyzeX: 70, redrawX: 194, dashX: 318, breakX: 462, width: 112, height: 38 },
+          circle: { center: { x: 326, y: 448 }, radius: 118, borderWidth: 2 },
+          order: {
+            pointCount: 8,
+            center: { x: 326, y: 448 },
+            radius: 104,
+            startAngle: -Math.PI / 2,
+            pointRadius: 13,
+            hitRadius: 24,
+            edgeWidth: 3,
+            labelSize: 11
+          },
+          balance: {
+            center: { x: 326, y: 448 },
+            axisOffset: 0,
+            dedupeTolerance: 0.5,
+            axisLineLength: 112,
+            axisLineWidth: 1,
+            axesByType: {
+              Damage: 1,
+              Burst: 2,
+              Heal: 2,
+              Energy: 3,
+              Buff: 3,
+              Curse: 4,
+              Vitality: 4
+            }
+          },
+          drawingRules: {
+            dashPattern: [10, 8],
+            guideDashPattern: [4, 6],
+            continuousLineBonus: 4,
+            disconnectedSegmentCost: 4,
+            strokeBreakPenalty: 2,
+            strokeBreakEffectPenalty: 0.01
+          },
+          analysis: {
+            shapePointTolerance: 8,
+            overlapTolerance: 4,
+            endpointTolerance: 4,
+            intersectionEpsilon: 0.0001,
+            outerTargetLength: Math.PI * 2 * 118,
+            outlineCompletionMax: 1,
+            openOutlineFactor: 0.4,
+            maxOpenOutlineCompletion: 0.55,
+            outerShapeThreshold: 0.72,
+            multiplierFloor: 0,
+            effectivenessBase: 1,
+            effectivenessMin: 0.8,
+            effectivenessMax: 1.2,
+            innerShapeBonus: 0.05,
+            crossingPenalty: 0.05,
+            overlapPenalty: 0.02,
+            breaksForgivenPerInnerShape: 1,
+            strengthBase: 1,
+            strengthPerLength: 0.00045,
+            maxStrengthBonus: 0.35,
+            minimumValue: 1,
+            manaPerLength: 0.012,
+            manaPerStroke: 1.5,
+            outerOutlineManaDiscount: 8,
+            minimumManaCost: 0,
+            gradeThresholds: { perfect: 1.15, strong: 1.05, stable: 0.92 },
+            traitCrossingThreshold: 2,
+            traitOutlineThreshold: 0.72
+          }
+        },
+        drawRect: { x: 70, y: 326, w: 512, h: 244 },
         analysisRect: { x: 636, y: 150, w: 570, h: 440 },
         guideRect: { x: 1126, y: 30, w: 92, h: 42 }
       };
@@ -131,9 +211,15 @@
         guideOpen: false,
         message: "Choose contracts for battle or create a new contract.",
         selectedType: "Damage",
+        creationMode: CONFIG.creation.defaultMode,
+        dashedDrawing: false,
         strokes: [],
         activeStroke: null,
+        activeStrokes: [],
         analysis: null,
+        analysisOverlayOpen: false,
+        orderPoints: Creation.createOrderPoints(CONFIG.creation.order, CONFIG.types),
+        orderState: null,
         library: createStarterContracts(),
         loadout: [...CONFIG.starterContracts.map((contract) => contract.id), null],
         selectedContractId: CONFIG.starterContracts[0].id,
@@ -141,6 +227,14 @@
         combat: null,
         particles: [],
         buttons: []
+      };
+
+      game.orderState = {
+        strokes: game.strokes,
+        edges: new Set(),
+        currentStrokeIndex: null,
+        lastPointIndex: null,
+        firstPointIndex: null
       };
 
       function fitCanvas() {
@@ -171,41 +265,128 @@
         return list[(Math.floor(Math.random() * list.length) + salt) % list.length];
       }
 
+      function resetCreationDrawing() {
+        game.strokes = [];
+        game.activeStroke = null;
+        game.activeStrokes = [];
+        game.analysis = null;
+        game.orderState = {
+          strokes: game.strokes,
+          edges: new Set(),
+          currentStrokeIndex: null,
+          lastPointIndex: null,
+          firstPointIndex: null
+        };
+      }
+
+      function selectCreationMode(mode, random = Math.random) {
+        if (!CONFIG.creation.modes[mode]) return false;
+        game.creationMode = mode;
+        resetCreationDrawing();
+        if (mode === "chaos") game.selectedType = CONFIG.types[Math.floor(random() * CONFIG.types.length)];
+        if (mode === "order") game.orderPoints = Creation.createOrderPoints(CONFIG.creation.order, CONFIG.types, random);
+        game.message = `${CONFIG.creation.modes[mode].label} selected.`;
+        return true;
+      }
+
+      function creationCircleContains(point) {
+        const circle = CONFIG.creation.circle;
+        return Math.hypot(point.x - circle.center.x, point.y - circle.center.y) <= circle.radius;
+      }
+
+      function balancePointConfig() {
+        return {
+          ...CONFIG.creation.balance,
+          axes: CONFIG.creation.balance.axesByType[game.selectedType]
+        };
+      }
+
+      function beginCreationStroke(point) {
+        if (game.creationMode === "order" || !creationCircleContains(point)) return false;
+        const points = game.creationMode === "balance" ? Creation.mirrorPointSet(point, balancePointConfig()) : [point];
+        game.activeStrokes = points.map((mirrored) => {
+          const stroke = [{ x: mirrored.x, y: mirrored.y }];
+          game.strokes.push(stroke);
+          return stroke;
+        });
+        game.activeStroke = game.activeStrokes[0] || null;
+        game.analysis = null;
+        return true;
+      }
+
+      function continueCreationStroke(point) {
+        if (!game.activeStrokes.length || !creationCircleContains(point)) return false;
+        const points = game.creationMode === "balance" ? Creation.mirrorPointSet(point, balancePointConfig()) : [point];
+        points.forEach((mirrored, index) => {
+          if (game.activeStrokes[index]) game.activeStrokes[index].push({ x: mirrored.x, y: mirrored.y });
+        });
+        game.analysis = null;
+        return true;
+      }
+
+      function endCreationStroke() {
+        game.activeStroke = null;
+        game.activeStrokes = [];
+      }
+
+      function selectOrderPoint(pointIndex) {
+        if (game.creationMode !== "order") return false;
+        const firstSelection = game.orderState.firstPointIndex === null;
+        const result = Creation.addOrderPoint(game.orderState, pointIndex, game.orderPoints);
+        if (!result.accepted) {
+          game.message = result.reason;
+          return false;
+        }
+        if (firstSelection) {
+          game.orderState.firstPointIndex = pointIndex;
+          game.selectedType = result.type;
+        }
+        game.analysis = null;
+        game.message = result.first ? `${result.type} mark starts this path.` : "Order edge added.";
+        return true;
+      }
+
+      function breakOrderStroke() {
+        Creation.breakOrderPath(game.orderState);
+        game.message = "Path broken. The next point starts a disconnected stroke with a mana penalty.";
+      }
+
+      function sharedAnalysisConfig() {
+        return { ...CONFIG.creation.analysis, ...CONFIG.creation.drawingRules };
+      }
+
+      function analyzeCurrentDrawing() {
+        const allowed = game.screen === "create" || (game.screen === "loadout" && game.analysisOverlayOpen);
+        if (!allowed) return null;
+        return Creation.analyzeDrawing(
+          game.strokes,
+          CONFIG.base[game.selectedType],
+          sharedAnalysisConfig(),
+          { dashed: game.dashedDrawing }
+        );
+      }
+
       function makeAnalysis() {
+        const allowed = game.screen === "create" || (game.screen === "loadout" && game.analysisOverlayOpen);
+        if (!allowed) return;
         const points = game.strokes.flat();
-        if (points.length < 6) {
+        if (points.length < CONFIG.creation.minimumAnalysisPoints) {
           game.analysis = null;
-          game.message = "Draw a real sigil first. Empty contracts are rejected.";
+          game.message = "Add at least two drawing points before analysis.";
           return;
         }
-
-        let minX = Infinity;
-        let minY = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        let length = 0;
-        for (const stroke of game.strokes) {
-          for (let i = 0; i < stroke.length; i += 1) {
-            const p = stroke[i];
-            minX = Math.min(minX, p.x);
-            minY = Math.min(minY, p.y);
-            maxX = Math.max(maxX, p.x);
-            maxY = Math.max(maxY, p.y);
-            if (i > 0) length += Math.hypot(p.x - stroke[i - 1].x, p.y - stroke[i - 1].y);
-          }
-        }
-
-        const areaUse = ((maxX - minX) * (maxY - minY)) / (CONFIG.drawRect.w * CONFIG.drawRect.h);
-        const complexity = game.strokes.length + points.length / 22;
-        const completion = Math.min(1, length / 520 + areaUse * 0.45);
-        const grade = completion > 1.05 ? "Perfect" : completion > 0.72 ? "Strong" : completion > 0.42 ? "Stable" : "Rough";
-        const trait = complexity > 7 ? "Ancient" : areaUse > 0.36 ? "Fierce" : game.strokes.length > 2 ? "Sealed" : "Swift";
+        const shared = analyzeCurrentDrawing();
+        if (!shared) return;
+        const thresholds = CONFIG.creation.analysis.gradeThresholds;
+        const grade = shared.effectiveness >= thresholds.perfect ? "Perfect"
+          : shared.effectiveness >= thresholds.strong ? "Strong"
+            : shared.effectiveness >= thresholds.stable ? "Stable" : "Rough";
+        const trait = shared.metrics.innerCompletedShapes > 0 ? "Sealed"
+          : shared.metrics.crossings >= CONFIG.creation.analysis.traitCrossingThreshold ? "Wild"
+            : shared.metrics.outerOutlineCompletion >= CONFIG.creation.analysis.traitOutlineThreshold ? "Ancient" : "Swift";
         const type = game.selectedType;
         const dragon = type === "Vitality" ? "Vorn" : pick(CONFIG.dragons);
         const power = pick(CONFIG.powers[type]);
-        const bonus = grade === "Perfect" ? 1.35 : grade === "Strong" ? 1.2 : grade === "Stable" ? 1.08 : 1;
-        const base = CONFIG.base[type];
-        const value = Math.round(base.effect * bonus);
         const callWords = [dragon, trait, ...power.split(" ")].filter((word) => !CONFIG.types.includes(word));
         const callName = callWords[game.callRoll % callWords.length];
 
@@ -216,13 +397,17 @@
           power,
           type,
           grade,
-          value,
-          cost: base.cost,
+          mode: game.creationMode,
+          value: shared.value,
+          cost: shared.cost,
+          effectiveness: shared.effectiveness,
+          metrics: shared.metrics,
           callWords,
           callName,
           cooldown: 1.5,
           sigil: game.strokes.map((stroke) => stroke.map((p) => ({ x: p.x, y: p.y }))),
-          why: `${grade} ${trait.toLowerCase()} sigil: ${Math.round(areaUse * 100)}% area, ${game.strokes.length} stroke(s).`
+          dashed: game.dashedDrawing,
+          why: `${grade} ${trait.toLowerCase()} sigil: ${Math.round(shared.effectiveness * 100)}% effective, ${shared.metrics.strokeCount} stroke(s).`
         };
         game.message = "Contract analysis ready. Save it or reroll the Call Name.";
       }
@@ -237,9 +422,7 @@
         game.selectedContractId = saved.id;
         const empty = game.loadout.findIndex((id) => !id);
         game.loadout[empty === -1 ? 0 : empty] = saved.id;
-        game.strokes = [];
-        game.activeStroke = null;
-        game.analysis = null;
+        resetCreationDrawing();
         game.callRoll = 0;
         game.message = "Contract saved. Entering combat.";
         startCombat();
@@ -259,7 +442,8 @@
 
       function openCreateContract() {
         game.screen = "create";
-        game.message = "Choose a Contract Type, draw a sigil, then save the analysis.";
+        selectCreationMode(CONFIG.creation.defaultMode);
+        game.message = "Choose a creation mode, draw a sigil, then analyze it.";
       }
 
       function equipContract(id) {
@@ -369,7 +553,7 @@
       function addSigilFlash(contract, actor) {
         const x = actor === "player" ? 320 : 930;
         const y = 350;
-        game.particles.push({ kind: "sigil", x, y, life: 0.55, color: CONFIG.typeColors[contract.type], sigil: contract.sigil });
+        game.particles.push({ kind: "sigil", x, y, life: 0.55, color: CONFIG.typeColors[contract.type], sigil: contract.sigil, dashed: contract.dashed });
       }
 
       function update(dt) {
@@ -461,35 +645,99 @@
       }
 
       function drawCreation() {
-        drawText("1. Choose Contract Type", 70, 124, 22, "#f3f4ea", "left", "700");
-        CONFIG.types.forEach((type, index) => {
-          const x = 70 + (index % 4) * 126;
-          const y = index < 4 ? 150 : 196;
-          button(type, x, y, 112, 38, () => {
-            game.selectedType = type;
-            game.analysis = null;
-            game.message = `${type} selected. Draw a sigil for this contract.`;
-          }, type === game.selectedType ? CONFIG.typeColors[type] : "#2e323b");
+        const creation = CONFIG.creation;
+        drawText("1. Creation Mode", creation.modeButtons.x, creation.labels.modeTitleY, 22, "#f3f4ea", "left", "700");
+        Object.entries(creation.modes).forEach(([mode, details], index) => {
+          const x = creation.modeButtons.x + index * (creation.modeButtons.width + creation.modeButtons.gap);
+          button(details.shortLabel, x, creation.modeButtons.y, creation.modeButtons.width, creation.modeButtons.height, () => selectCreationMode(mode), mode === game.creationMode ? "#5fb3a1" : "#2e323b");
         });
 
-        drawText("2. Draw Sigil", CONFIG.drawRect.x, CONFIG.drawRect.y - 18, 22, "#f3f4ea", "left", "700");
-        ctx.fillStyle = "#12141a";
-        roundRect(CONFIG.drawRect.x, CONFIG.drawRect.y, CONFIG.drawRect.w, CONFIG.drawRect.h, 8, true, false);
-        ctx.strokeStyle = CONFIG.typeColors[game.selectedType];
-        ctx.lineWidth = 2;
-        roundRect(CONFIG.drawRect.x, CONFIG.drawRect.y, CONFIG.drawRect.w, CONFIG.drawRect.h, 8, false, true);
-        drawText("Draw here with mouse or touch", CONFIG.drawRect.x + CONFIG.drawRect.w / 2, CONFIG.drawRect.y + CONFIG.drawRect.h / 2 - 10, 18, "#68707a", "center");
-        drawStoredSigil(game.strokes, 0, 0, 1, CONFIG.typeColors[game.selectedType], 1);
+        if (game.creationMode === "balance") {
+          drawText("2. Contract Type / Symmetry Mark", creation.typeButtons.x, creation.labels.typeTitleY, 18, "#f3f4ea", "left", "700");
+          CONFIG.types.forEach((type, index) => {
+            const column = index % creation.typeButtons.columns;
+            const x = creation.typeButtons.x + column * (creation.typeButtons.width + creation.typeButtons.gap);
+            const y = index < creation.typeButtons.columns ? creation.typeButtons.firstY : creation.typeButtons.secondY;
+            button(type, x, y, creation.typeButtons.width, creation.typeButtons.height, () => {
+              game.selectedType = type;
+              resetCreationDrawing();
+              game.message = `${type} selected with ${creation.balance.axesByType[type]} symmetry axis/axes.`;
+            }, type === game.selectedType ? CONFIG.typeColors[type] : "#2e323b");
+          });
+        } else {
+          const status = game.creationMode === "chaos"
+            ? `2. Random Contract Type: ${game.selectedType}`
+            : `2. First Point Type: ${game.orderState.firstPointIndex === null ? "Choose a point" : game.selectedType}`;
+          drawText(status, creation.typeButtons.x, creation.labels.typeTitleY, 18, CONFIG.typeColors[game.selectedType], "left", "700");
+          drawText(creation.modes[game.creationMode].label, creation.typeButtons.x, creation.labels.statusY, 15, "#b8c0b0");
+        }
 
-        button("Analyze", 70, 586, 118, 38, makeAnalysis);
-        button("Redraw", 202, 586, 118, 38, () => {
-          game.strokes = [];
-          game.activeStroke = null;
-          game.analysis = null;
+        drawText("3. Draw Sigil", CONFIG.drawRect.x, creation.labels.drawingTitleY, 20, "#f3f4ea", "left", "700");
+        drawCreationSurface();
+
+        button("Analyze", creation.actions.analyzeX, creation.actions.y, creation.actions.width, creation.actions.height, makeAnalysis);
+        button("Redraw", creation.actions.redrawX, creation.actions.y, creation.actions.width, creation.actions.height, () => {
+          resetCreationDrawing();
           game.message = "Drawing cleared.";
         });
-
+        button(game.dashedDrawing ? "Dashed On" : "Dashed Off", creation.actions.dashX, creation.actions.y, creation.actions.width, creation.actions.height, () => {
+          game.dashedDrawing = !game.dashedDrawing;
+          game.analysis = null;
+          game.message = game.dashedDrawing ? "Dashed drawing enabled." : "Solid drawing enabled.";
+        });
+        if (game.creationMode === "order") button("Break Path", creation.actions.breakX, creation.actions.y, creation.actions.width, creation.actions.height, breakOrderStroke);
         drawAnalysisPanel();
+      }
+
+      function drawCreationSurface() {
+        const creation = CONFIG.creation;
+        const circle = creation.circle;
+        ctx.fillStyle = "#12141a";
+        ctx.beginPath();
+        ctx.arc(circle.center.x, circle.center.y, circle.radius, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = CONFIG.typeColors[game.selectedType];
+        ctx.lineWidth = circle.borderWidth;
+        ctx.stroke();
+
+        if (game.creationMode === "balance") drawSymmetryAxes();
+        if (!game.strokes.length) {
+          const instruction = game.creationMode === "order" ? "Select points to connect the marked octagon" : "Draw inside the circle";
+          drawText(instruction, circle.center.x, circle.center.y, 16, "#68707a", "center");
+        }
+        const strokeWidth = game.creationMode === "order" ? creation.order.edgeWidth : null;
+        drawStoredSigil(game.strokes, 0, 0, 1, CONFIG.typeColors[game.selectedType], 1, game.dashedDrawing, strokeWidth);
+        if (game.creationMode === "order") drawOrderPoints();
+      }
+
+      function drawSymmetryAxes() {
+        const balance = balancePointConfig();
+        const dash = CONFIG.creation.drawingRules.guideDashPattern;
+        ctx.save();
+        ctx.strokeStyle = "#68707a";
+        ctx.lineWidth = balance.axisLineWidth;
+        ctx.setLineDash(dash);
+        for (let axis = 0; axis < balance.axes; axis += 1) {
+          const angle = balance.axisOffset + axis * Math.PI / balance.axes;
+          const dx = Math.cos(angle) * balance.axisLineLength;
+          const dy = Math.sin(angle) * balance.axisLineLength;
+          ctx.beginPath();
+          ctx.moveTo(balance.center.x - dx, balance.center.y - dy);
+          ctx.lineTo(balance.center.x + dx, balance.center.y + dy);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawOrderPoints() {
+        const order = CONFIG.creation.order;
+        game.orderPoints.forEach((point) => {
+          ctx.fillStyle = CONFIG.typeColors[point.type];
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, order.pointRadius, 0, TAU);
+          ctx.fill();
+          drawText(point.type, point.x, point.y - order.pointRadius - order.labelSize, order.labelSize, CONFIG.typeColors[point.type], "center", "700");
+        });
       }
 
       function drawAnalysisPanel() {
@@ -498,28 +746,26 @@
         roundRect(r.x, r.y, r.w, r.h, 8, true, false);
         ctx.strokeStyle = "#68707a";
         roundRect(r.x, r.y, r.w, r.h, 8, false, true);
-        drawText("3. Contract Analysis", r.x + 28, r.y + 34, 28, "#f3f4ea", "left", "700");
+        drawText("4. Contract Analysis", r.x + 28, r.y + 34, 28, "#f3f4ea", "left", "700");
         if (!game.analysis) {
           drawText("No analysis yet.", r.x + 28, r.y + 94, 20, "#b8c0b0");
-          drawText("Pick a Contract Type, draw a mark, then press Analyze.", r.x + 28, r.y + 126, 17, "#b8c0b0");
+          drawText("Choose a mode, draw a mark, then press Analyze.", r.x + 28, r.y + 126, 17, "#b8c0b0");
           return;
         }
         const a = game.analysis;
-        let y = r.y + 90;
-        drawText("Dragon - Trait - Power:", r.x + 28, y, 17, "#e8dca8", "left", "700"); y += 28;
-        drawText(`${a.dragon} - ${a.trait} - ${a.power}`, r.x + 28, y, 23, "#f3f4ea", "left", "700"); y += 48;
-        drawText("Contract Call:", r.x + 28, y, 17, "#e8dca8", "left", "700");
-        drawText(`[${a.callName}]`, r.x + 178, y - 3, 23, CONFIG.typeColors[a.type], "left", "700");
-        button("Reroll", r.x + 388, y - 16, 112, 38, () => {
+        const y = r.y + 82;
+        drawText(`${a.dragon} - ${a.trait} - ${a.power}`, r.x + 28, y, 23, "#f3f4ea", "left", "700");
+        drawText("Contract Call:", r.x + 28, y + 42, 17, "#e8dca8", "left", "700");
+        drawText(`[${a.callName}]`, r.x + 178, y + 39, 23, CONFIG.typeColors[a.type], "left", "700");
+        button("Reroll", r.x + 388, y + 24, 112, 38, () => {
           game.callRoll += 1;
           makeAnalysis();
-        }); y += 48;
-        drawText("Must be one word from this contract.", r.x + 28, y, 15, "#b8c0b0"); y += 36;
-        drawText(`Effect: ${effectText(a)}`, r.x + 28, y, 20, "#f3f4ea"); y += 34;
-        drawText(`Cost: ${a.cost} Energy`, r.x + 28, y, 20, "#f3f4ea"); y += 34;
-        drawText(`Cooldown: ${a.cooldown}s`, r.x + 28, y, 20, "#f3f4ea"); y += 34;
-        drawText(`Grade: ${a.grade}`, r.x + 28, y, 20, "#f3f4ea"); y += 34;
-        drawText(`Why: ${a.why}`, r.x + 28, y, 16, "#b8c0b0");
+        });
+        drawText(`Effect: ${effectText(a)}`, r.x + 28, y + 88, 19, "#f3f4ea");
+        drawText(`Mana Cost: ${a.cost}`, r.x + 28, y + 118, 19, "#f3f4ea");
+        drawText(`Effectiveness: ${Math.round(a.effectiveness * 100)}% | Grade: ${a.grade}`, r.x + 28, y + 148, 18, "#f3f4ea");
+        drawText(`Length ${Math.round(a.metrics.totalDrawingLength)} | Strokes ${a.metrics.strokeCount} | Breaks ${a.metrics.strokeBreaks}`, r.x + 28, y + 180, 15, "#b8c0b0");
+        drawText(`Outline ${Math.round(a.metrics.outerOutlineCompletion * 100)}% | Shapes ${a.metrics.innerCompletedShapes} | Crossings ${a.metrics.crossings} | Overlaps ${a.metrics.overlaps}`, r.x + 28, y + 206, 15, "#b8c0b0");
         button("Save & Combat", r.x + 28, r.y + r.h - 66, 170, 44, saveContract, "#5fb3a1");
         button("Cancel", r.x + 216, r.y + r.h - 66, 154, 44, () => { game.screen = "loadout"; });
       }
@@ -663,9 +909,9 @@
 
       function guideLines() {
         if (game.screen === "create") return [
-          "Choose a Contract Type, then draw inside the sigil box.",
-          "Analyze turns your drawing into Dragon, Trait, Power, Grade, and Call Name.",
-          "Reroll changes the short Call Name. Save puts the contract in your Library."
+          "Chaos draws freely, Order connects typed points, and Balance mirrors your strokes.",
+          "Continuous outlines cost less mana; breaks, crossings, and overlaps carry penalties.",
+          "Analyze uses one shared metric system, then Save enters combat."
         ];
         if (game.screen === "loadout") return [
           "Equip saved contracts into the four battle slots.",
@@ -686,16 +932,17 @@
           ctx.globalAlpha = clamp(particle.life * 2, 0, 1);
           ctx.translate(particle.x, particle.y);
           const scale = 0.34 + (0.55 - particle.life) * 0.4;
-          drawStoredSigil(particle.sigil, -CONFIG.drawRect.x * scale, -CONFIG.drawRect.y * scale, scale, particle.color, 1);
+          drawStoredSigil(particle.sigil, -CONFIG.drawRect.x * scale, -CONFIG.drawRect.y * scale, scale, particle.color, 1, particle.dashed);
           ctx.restore();
         }
       }
 
-      function drawStoredSigil(strokes, ox, oy, scale, color, alpha) {
+      function drawStoredSigil(strokes, ox, oy, scale, color, alpha, dashed = false, configuredLineWidth = null) {
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = color;
-        ctx.lineWidth = Math.max(2, 4 * scale);
+        ctx.setLineDash(dashed ? CONFIG.creation.drawingRules.dashPattern : []);
+        ctx.lineWidth = configuredLineWidth ?? Math.max(2, 4 * scale);
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         for (const stroke of strokes) {
@@ -781,21 +1028,24 @@
             return;
           }
         }
-        if (game.screen === "create" && !game.guideOpen && inRect(p, CONFIG.drawRect)) {
-          game.activeStroke = [p];
-          game.strokes.push(game.activeStroke);
-          game.analysis = null;
+        if (game.screen === "create" && !game.guideOpen) {
+          if (game.creationMode === "order") {
+            const pointIndex = game.orderPoints.findIndex((point) => Math.hypot(p.x - point.x, p.y - point.y) <= CONFIG.creation.order.hitRadius);
+            if (pointIndex !== -1) selectOrderPoint(pointIndex);
+          } else {
+            beginCreationStroke(p);
+          }
         }
       });
 
       canvas.addEventListener("pointermove", (event) => {
-        if (!game.activeStroke) return;
+        if (!game.activeStrokes.length) return;
         const p = pointFromEvent(event);
-        if (inRect(p, CONFIG.drawRect)) game.activeStroke.push(p);
+        continueCreationStroke(p);
       });
 
       window.addEventListener("pointerup", () => {
-        game.activeStroke = null;
+        endCreationStroke();
       });
 
       window.addEventListener("keydown", (event) => {
@@ -812,12 +1062,22 @@
 
       window.DragonContractor = {
         CONFIG,
+        Creation,
+        analyzeCurrentDrawing,
+        beginCreationStroke,
+        breakOrderStroke,
+        continueCreationStroke,
+        draw,
         game,
         deleteContract,
+        endCreationStroke,
         endGame,
         equipContract,
+        makeAnalysis,
         openCreateContract,
         saveContract,
+        selectCreationMode,
+        selectOrderPoint,
         startCombat
       };
 

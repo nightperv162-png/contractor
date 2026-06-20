@@ -30,3 +30,6 @@
 - The game flow is `Loadout` -> `Create Contract` -> `Combat` -> `End Game` -> `Loadout`.
 - New sessions start with three weak starter contracts defined in `CONFIG.starterContracts` and copied into game state.
 - Deleting a contract clears its loadout slots and safely advances or clears `selectedContractId`.
+- Contract Creation has three Canvas-only modes: Chaos free-draw with random type, Order typed-point connections, and Balance mirrored drawing.
+- Shared drawing metrics and stat formulas live in `src/contract-creation.js`; all modes use the same analyzer.
+- Creation tuning, geometry, penalties, symmetry axes, and 80%-120% effectiveness limits live under `CONFIG.creation`.
