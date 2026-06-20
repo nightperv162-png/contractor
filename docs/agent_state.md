@@ -7,7 +7,7 @@ Read only `docs/agent_state.md`, `docs/agent_brief.md`, and the last 30 lines of
 Maintain the Dragon Contractor game and its GitHub Pages deployment.
 
 ## Current Task
-Add Chaos, Order, and Balance Contract Creation modes with shared drawing analysis.
+Update Balance, Order, and Core Line Contract Creation rules.
 
 ## Completed Steps
 - GitHub Pages deployment and root documentation consolidation were completed and pushed previously.
@@ -29,9 +29,26 @@ Add Chaos, Order, and Balance Contract Creation modes with shared drawing analys
 - Verified the helper and inline scripts compile, `git diff --check` passes, and both local static assets return HTTP 200.
 - Rendered in-app browser verification was unavailable in this session.
 - Committed the verified creation-mode implementation and tests on `main`.
+- Delayed Chaos random type assignment until a valid analysis runs.
+- Added configured maximum mana cost of 50 and a separate global effect boost of 1.2.
+- Kept effectiveness independently clamped to 0.8-1.2 before applying the global boost.
+- Added focused tests for delayed Chaos assignment, mana cap, and the 20% effect boost; all 24 project tests pass.
+- Inlined the shared Contract Creation geometry and analysis API into `index.html`.
+- Removed the external `src/contract-creation.js` runtime dependency and updated tests to use the inlined API.
+- Added clear `CONFIG`, `ASSETS`, `STATE`, `INPUT`, `CONTRACT CREATION`, `COMBAT`, `UPDATE`, `RENDER`, and `MAIN LOOP` sections.
+- Confirmed all current game features remain Canvas-only and the full 24-test suite passes from `index.html` alone.
+- Verified the local server returns HTTP 200 and `index.html` contains one inline script with no external runtime script reference.
+- Replaced dashed drawing with configurable Core Lines; each Core Line applies x1.05 effect and x1.1 uncapped energy.
+- Changed Balance analysis so occupied area drives effect and drawing energy instead of line length.
+- Raised the configured global energy cap to 60 and updated analysis UI with type, capped energy, effect multiplier, Core Line count, and Balance occupied area.
+- Confirmed Order's first selected point sets type and is stored as the first path point while reversed duplicate edges remain blocked.
+- Added focused Balance, Order, Core Line, broken-path, and dash-removal tests; all 30 project tests pass.
+- Verified the single-file build, Create Contract UI labels, local HTTP 200, and no external runtime script dependency.
+- Interactive browser verification was unavailable; all three modes passed Canvas render tests.
+- Committed the verified single-file Contract Creation rule update on `main`.
 
 ## Next Action
-Push `main` to GitHub, then verify all three creation modes on GitHub Pages.
+Push `main` to GitHub, then verify the updated Create Contract UI on GitHub Pages.
 
 ## Blockers
 - None.

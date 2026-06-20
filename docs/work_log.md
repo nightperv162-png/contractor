@@ -52,3 +52,14 @@
 - Added 15 requested creation-analysis tests plus a Canvas render smoke test; all 22 project tests pass.
 - Verified JavaScript compilation, local page/module HTTP 200 responses, and `git diff --check`; in-app rendered verification was unavailable.
 - Committed the verified Contract Creation modes, shared analyzer, tests, and documentation on `main`.
+- Delayed Chaos type assignment until valid analysis, capped mana at configured 50, and applied configured 1.2 global effect boost after effectiveness.
+- Added three focused tests; all 24 project tests and JavaScript compile checks pass.
+- Inlined the shared creation analyzer into `index.html`, updated tests to load only that file, and removed `src/contract-creation.js`.
+- Verified `index.html` is the only playable runtime source while docs and tests remain as non-runtime project support.
+- Final validation passed: 24/24 tests, one inline script compiled, local HTTP 200, no external runtime script reference, and `git diff --check` clean.
+- Interactive browser verification was unavailable; Canvas render tests covered Chaos, Order, and Balance.
+- Replaced dashed drawing with Core Lines and added configured x1.05 effect/x1.1 energy multipliers with a global 60 Energy cap.
+- Changed Balance to use occupied area for effect and energy; kept one shared analyzer for all modes.
+- Confirmed Order's first point sets type and starts the path, with reversed duplicate edges still blocked.
+- Added new rule/UI tests; all 30 tests, single-file compilation, UI label checks, HTTP 200, and `git diff --check` passed.
+- Committed the verified Balance, Order, Core Line, single-file consolidation, tests, and documentation on `main`.

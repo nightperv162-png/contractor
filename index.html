@@ -26,12 +26,11 @@
   <body>
     <canvas id="gameCanvas" aria-label="Dragon Contractor canvas game"></canvas>
 
-    <script src="./src/contract-creation.js"></script>
     <script>
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
-      const Creation = window.ContractCreation;
 
+      // CONFIG
       const CONFIG = {
         app: {
           width: 1280,
@@ -114,10 +113,11 @@
             balance: { label: "Balance Contract Creation", shortLabel: "Balance" }
           },
           minimumAnalysisPoints: 2,
+          unassignedTypeColor: "#68707a",
           modeButtons: { x: 70, y: 146, width: 156, height: 38, gap: 12 },
           typeButtons: { x: 70, firstY: 220, secondY: 260, width: 112, height: 34, gap: 14, columns: 4 },
           labels: { modeTitleY: 126, typeTitleY: 204, drawingTitleY: 316, statusY: 238 },
-          actions: { y: 590, analyzeX: 70, redrawX: 194, dashX: 318, breakX: 462, width: 112, height: 38 },
+          actions: { y: 590, analyzeX: 70, redrawX: 194, coreX: 318, breakX: 462, width: 112, height: 38 },
           circle: { center: { x: 326, y: 448 }, radius: 118, borderWidth: 2 },
           order: {
             pointCount: 8,
@@ -135,6 +135,9 @@
             dedupeTolerance: 0.5,
             axisLineLength: 112,
             axisLineWidth: 1,
+            occupiedAreaReference: Math.PI * 118 * 118,
+            areaEffectBonusMax: 0.35,
+            areaEnergyCostMax: 30,
             axesByType: {
               Damage: 1,
               Burst: 2,
@@ -146,12 +149,13 @@
             }
           },
           drawingRules: {
-            dashPattern: [10, 8],
-            guideDashPattern: [4, 6],
             continuousLineBonus: 4,
             disconnectedSegmentCost: 4,
             strokeBreakPenalty: 2,
-            strokeBreakEffectPenalty: 0.01
+            strokeBreakEffectPenalty: 0.01,
+            coreLineEffectMultiplier: 1.05,
+            coreLineEnergyMultiplier: 1.1,
+            coreLineWidthMultiplier: 1.6
           },
           analysis: {
             shapePointTolerance: 8,
@@ -174,11 +178,13 @@
             strengthBase: 1,
             strengthPerLength: 0.00045,
             maxStrengthBonus: 0.35,
+            globalEffectBoost: 1.2,
             minimumValue: 1,
-            manaPerLength: 0.012,
-            manaPerStroke: 1.5,
-            outerOutlineManaDiscount: 8,
-            minimumManaCost: 0,
+            energyPerLength: 0.012,
+            energyPerStroke: 1.5,
+            outerOutlineEnergyDiscount: 8,
+            minimumEnergyCost: 0,
+            maxEnergyCost: 60,
             gradeThresholds: { perfect: 1.15, strong: 1.05, stable: 0.92 },
             traitCrossingThreshold: 2,
             traitOutlineThreshold: 0.72
@@ -189,6 +195,264 @@
         guideRect: { x: 1126, y: 30, w: 92, h: 42 }
       };
 
+      // ASSETS
+      const ASSETS = Object.freeze({});
+
+      // CONTRACT CREATION
+      const Creation = (() => {
+        function clampValue(value, min, max) {
+          return Math.max(min, Math.min(max, value));
+        }
+
+        function distance(a, b) {
+          return Math.hypot(a.x - b.x, a.y - b.y);
+        }
+
+        function edgeKey(first, second) {
+          return first < second ? `${first}:${second}` : `${second}:${first}`;
+        }
+
+        function createOrderPoints(config, types, random = Math.random) {
+          const points = [];
+          for (let index = 0; index < config.pointCount; index += 1) {
+            const angle = config.startAngle + index * Math.PI * 2 / config.pointCount;
+            const type = index < types.length ? types[index] : types[Math.floor(random() * types.length)];
+            points.push({
+              x: config.center.x + Math.cos(angle) * config.radius,
+              y: config.center.y + Math.sin(angle) * config.radius,
+              type,
+              index
+            });
+          }
+          return points;
+        }
+
+        function addOrderPoint(state, pointIndex, points) {
+          const point = points[pointIndex];
+          if (!point) return { accepted: false, reason: "Unknown point." };
+          if (state.lastPointIndex === null) {
+            state.strokes.push([{ x: point.x, y: point.y, orderIndex: pointIndex }]);
+            state.currentStrokeIndex = state.strokes.length - 1;
+            state.lastPointIndex = pointIndex;
+            return { accepted: true, first: true, type: point.type };
+          }
+          if (state.lastPointIndex === pointIndex) return { accepted: false, reason: "Choose a different point." };
+
+          const key = edgeKey(state.lastPointIndex, pointIndex);
+          if (state.edges.has(key)) return { accepted: false, reason: "That edge already exists." };
+          state.edges.add(key);
+          state.strokes[state.currentStrokeIndex].push({ x: point.x, y: point.y, orderIndex: pointIndex });
+          state.lastPointIndex = pointIndex;
+          return { accepted: true, first: false, type: point.type, edge: key };
+        }
+
+        function breakOrderPath(state) {
+          state.lastPointIndex = null;
+          state.currentStrokeIndex = null;
+        }
+
+        function isContinuousPath(strokes) {
+          return strokes.filter((stroke) => stroke.length > 1).length <= 1;
+        }
+
+        function mirrorPointSet(point, config) {
+          const dx = point.x - config.center.x;
+          const dy = point.y - config.center.y;
+          const radius = Math.hypot(dx, dy);
+          const angle = Math.atan2(dy, dx) - config.axisOffset;
+          const points = [];
+          for (let axis = 0; axis < config.axes; axis += 1) {
+            const rotation = axis * Math.PI * 2 / config.axes + config.axisOffset;
+            for (const reflectedAngle of [angle + rotation, -angle + rotation]) {
+              const mirrored = {
+                x: config.center.x + Math.cos(reflectedAngle) * radius,
+                y: config.center.y + Math.sin(reflectedAngle) * radius
+              };
+              if (!points.some((candidate) => distance(candidate, mirrored) <= config.dedupeTolerance)) points.push(mirrored);
+            }
+          }
+          return points;
+        }
+
+        function collectSegments(strokes) {
+          const segments = [];
+          strokes.forEach((stroke, strokeIndex) => {
+            for (let pointIndex = 1; pointIndex < stroke.length; pointIndex += 1) {
+              segments.push({
+                a: stroke[pointIndex - 1],
+                b: stroke[pointIndex],
+                strokeIndex,
+                pointIndex: pointIndex - 1
+              });
+            }
+          });
+          return segments;
+        }
+
+        function buildGraph(strokes, tolerance) {
+          const nodes = [];
+          const edges = [];
+          const parent = [];
+
+          function find(index) {
+            if (parent[index] !== index) parent[index] = find(parent[index]);
+            return parent[index];
+          }
+
+          function union(first, second) {
+            const rootA = find(first);
+            const rootB = find(second);
+            if (rootA !== rootB) parent[rootB] = rootA;
+          }
+
+          function nodeFor(point) {
+            let index = nodes.findIndex((node) => distance(node, point) <= tolerance);
+            if (index !== -1) return index;
+            index = nodes.length;
+            nodes.push({ x: point.x, y: point.y });
+            parent.push(index);
+            return index;
+          }
+
+          for (const stroke of strokes) {
+            if (!stroke.length) continue;
+            nodeFor(stroke[0]);
+            for (let index = 1; index < stroke.length; index += 1) {
+              const first = nodeFor(stroke[index - 1]);
+              const second = nodeFor(stroke[index]);
+              edges.push([first, second]);
+              union(first, second);
+            }
+          }
+
+          const components = new Set(nodes.map((node, index) => find(index))).size;
+          const completedShapes = Math.max(0, edges.length - nodes.length + components);
+          return { completedShapes, components };
+        }
+
+        function linesCross(first, second, epsilon, endpointTolerance) {
+          if ([first.a, first.b].some((pointA) => [second.a, second.b].some((pointB) => distance(pointA, pointB) <= endpointTolerance))) return false;
+          const denominator = (first.a.x - first.b.x) * (second.a.y - second.b.y) - (first.a.y - first.b.y) * (second.a.x - second.b.x);
+          if (Math.abs(denominator) <= epsilon) return false;
+          const t = ((first.a.x - second.a.x) * (second.a.y - second.b.y) - (first.a.y - second.a.y) * (second.a.x - second.b.x)) / denominator;
+          const u = -((first.a.x - first.b.x) * (first.a.y - second.a.y) - (first.a.y - first.b.y) * (first.a.x - second.a.x)) / denominator;
+          return t > epsilon && t < 1 - epsilon && u > epsilon && u < 1 - epsilon;
+        }
+
+        function countCrossings(segments, config) {
+          let crossings = 0;
+          for (let first = 0; first < segments.length; first += 1) {
+            for (let second = first + 1; second < segments.length; second += 1) {
+              if (linesCross(segments[first], segments[second], config.intersectionEpsilon, config.endpointTolerance)) crossings += 1;
+            }
+          }
+          return crossings;
+        }
+
+        function countOverlaps(strokes, tolerance) {
+          const points = strokes.flatMap((stroke, strokeIndex) => stroke.map((point, pointIndex) => ({ point, strokeIndex, pointIndex })));
+          let overlaps = 0;
+          for (let first = 0; first < points.length; first += 1) {
+            for (let second = first + 1; second < points.length; second += 1) {
+              const a = points[first];
+              const b = points[second];
+              if (a.strokeIndex === b.strokeIndex && Math.abs(a.pointIndex - b.pointIndex) <= 1) continue;
+              if (distance(a.point, b.point) <= tolerance) overlaps += 1;
+            }
+          }
+          return overlaps;
+        }
+
+        function analyzeDrawing(strokes, base, config, options = {}) {
+          const drawableStrokes = strokes.filter((stroke) => stroke.length > 0);
+          const segments = collectSegments(drawableStrokes);
+          const totalDrawingLength = segments.reduce((total, segment) => total + distance(segment.a, segment.b), 0);
+          const graph = buildGraph(drawableStrokes, config.shapePointTolerance);
+          const strokeCount = drawableStrokes.length;
+          const disconnectedSegments = graph.components;
+          const strokeBreaks = Math.max(0, strokeCount - 1) + (options.extraStrokeBreaks || 0);
+          const crossings = countCrossings(segments, config);
+          const overlaps = countOverlaps(drawableStrokes, config.overlapTolerance);
+          const occupiedXs = drawableStrokes.flatMap((stroke) => stroke.map((point) => point.x));
+          const occupiedYs = drawableStrokes.flatMap((stroke) => stroke.map((point) => point.y));
+          const occupiedArea = occupiedXs.length
+            ? (Math.max(...occupiedXs) - Math.min(...occupiedXs)) * (Math.max(...occupiedYs) - Math.min(...occupiedYs))
+            : 0;
+          const occupiedAreaRatio = clampValue(occupiedArea / config.occupiedAreaReference, 0, 1);
+          const outlineRatio = totalDrawingLength / config.outerTargetLength;
+          const outerOutlineCompletion = graph.completedShapes > 0
+            ? clampValue(outlineRatio, config.multiplierFloor, config.outlineCompletionMax)
+            : clampValue(outlineRatio * config.openOutlineFactor, config.multiplierFloor, config.maxOpenOutlineCompletion);
+          const hasOuterOutline = outerOutlineCompletion >= config.outerShapeThreshold;
+          const innerCompletedShapes = Math.max(0, graph.completedShapes - (hasOuterOutline ? 1 : 0));
+          const penalizedBreaks = Math.max(0, strokeBreaks - innerCompletedShapes * config.breaksForgivenPerInnerShape);
+          const effectiveness = clampValue(
+            config.effectivenessBase
+              + innerCompletedShapes * config.innerShapeBonus
+              - crossings * config.crossingPenalty
+              - overlaps * config.overlapPenalty
+              - penalizedBreaks * config.strokeBreakEffectPenalty,
+            config.effectivenessMin,
+            config.effectivenessMax
+          );
+          const strengthBonus = options.mode === "balance"
+            ? occupiedAreaRatio * config.areaEffectBonusMax
+            : Math.min(config.maxStrengthBonus, totalDrawingLength * config.strengthPerLength);
+          const coreLineCount = options.coreLineCount || 0;
+          const coreLineEffect = Math.pow(config.coreLineEffectMultiplier, coreLineCount);
+          const effectMultiplier = (config.strengthBase + strengthBonus) * effectiveness * config.globalEffectBoost * coreLineEffect;
+          const value = Math.max(config.minimumValue, Math.round(base.effect * effectMultiplier));
+          const continuous = strokeCount === 1 && disconnectedSegments <= 1;
+          const drawingEnergy = options.mode === "balance"
+            ? occupiedAreaRatio * config.areaEnergyCostMax
+            : totalDrawingLength * config.energyPerLength;
+          const baseEnergyCost = base.cost
+            + drawingEnergy
+            + strokeCount * config.energyPerStroke
+            + Math.max(0, disconnectedSegments - 1) * config.disconnectedSegmentCost
+            + strokeBreaks * config.strokeBreakPenalty
+            - outerOutlineCompletion * config.outerOutlineEnergyDiscount
+            - (continuous ? config.continuousLineBonus : 0);
+          const uncappedEnergyCost = baseEnergyCost * Math.pow(config.coreLineEnergyMultiplier, coreLineCount);
+          const cost = clampValue(Math.round(uncappedEnergyCost), config.minimumEnergyCost, config.maxEnergyCost);
+
+          return {
+            value,
+            cost,
+            effectiveness,
+            effectMultiplier,
+            metrics: {
+              totalDrawingLength,
+              strokeCount,
+              disconnectedSegments,
+              strokeBreaks,
+              outerOutlineCompletion,
+              completedShapes: graph.completedShapes,
+              innerCompletedShapes,
+              crossings,
+              overlaps,
+              continuous,
+              coreLineCount,
+              occupiedArea,
+              occupiedAreaRatio,
+              baseEnergyCost,
+              uncappedEnergyCost
+            }
+          };
+        }
+
+        return {
+          addOrderPoint,
+          analyzeDrawing,
+          breakOrderPath,
+          createOrderPoints,
+          edgeKey,
+          isContinuousPath,
+          mirrorPointSet
+        };
+      })();
+
+      // STATE
       const W = CONFIG.app.width;
       const H = CONFIG.app.height;
       const TAU = CONFIG.app.fullCircleRadians;
@@ -212,7 +476,8 @@
         message: "Choose contracts for battle or create a new contract.",
         selectedType: "Damage",
         creationMode: CONFIG.creation.defaultMode,
-        dashedDrawing: false,
+        coreLineMode: false,
+        coreLineGroups: [],
         strokes: [],
         activeStroke: null,
         activeStrokes: [],
@@ -265,11 +530,15 @@
         return list[(Math.floor(Math.random() * list.length) + salt) % list.length];
       }
 
+      // CONTRACT CREATION
       function resetCreationDrawing() {
         game.strokes = [];
         game.activeStroke = null;
         game.activeStrokes = [];
         game.analysis = null;
+        game.coreLineMode = false;
+        game.coreLineGroups = [];
+        if (game.creationMode === "chaos") game.selectedType = null;
         game.orderState = {
           strokes: game.strokes,
           edges: new Set(),
@@ -283,8 +552,11 @@
         if (!CONFIG.creation.modes[mode]) return false;
         game.creationMode = mode;
         resetCreationDrawing();
-        if (mode === "chaos") game.selectedType = CONFIG.types[Math.floor(random() * CONFIG.types.length)];
-        if (mode === "order") game.orderPoints = Creation.createOrderPoints(CONFIG.creation.order, CONFIG.types, random);
+        if (mode === "order") {
+          game.selectedType = null;
+          game.orderPoints = Creation.createOrderPoints(CONFIG.creation.order, CONFIG.types, random);
+        }
+        if (mode === "balance" && !game.selectedType) game.selectedType = CONFIG.types[0];
         game.message = `${CONFIG.creation.modes[mode].label} selected.`;
         return true;
       }
@@ -301,14 +573,22 @@
         };
       }
 
+      function selectedTypeColor() {
+        return CONFIG.typeColors[game.selectedType] || CONFIG.creation.unassignedTypeColor;
+      }
+
       function beginCreationStroke(point) {
         if (game.creationMode === "order" || !creationCircleContains(point)) return false;
         const points = game.creationMode === "balance" ? Creation.mirrorPointSet(point, balancePointConfig()) : [point];
+        const firstStrokeIndex = game.strokes.length;
         game.activeStrokes = points.map((mirrored) => {
           const stroke = [{ x: mirrored.x, y: mirrored.y }];
           game.strokes.push(stroke);
           return stroke;
         });
+        if (game.coreLineMode) {
+          game.coreLineGroups.push(game.activeStrokes.map((stroke, index) => firstStrokeIndex + index));
+        }
         game.activeStroke = game.activeStrokes[0] || null;
         game.analysis = null;
         return true;
@@ -341,6 +621,7 @@
           game.orderState.firstPointIndex = pointIndex;
           game.selectedType = result.type;
         }
+        if (result.first && game.coreLineMode) game.coreLineGroups.push([game.orderState.currentStrokeIndex]);
         game.analysis = null;
         game.message = result.first ? `${result.type} mark starts this path.` : "Order edge added.";
         return true;
@@ -348,11 +629,17 @@
 
       function breakOrderStroke() {
         Creation.breakOrderPath(game.orderState);
-        game.message = "Path broken. The next point starts a disconnected stroke with a mana penalty.";
+        game.message = "Path broken. The next point starts a separate path with an energy penalty.";
       }
 
       function sharedAnalysisConfig() {
-        return { ...CONFIG.creation.analysis, ...CONFIG.creation.drawingRules };
+        return {
+          ...CONFIG.creation.analysis,
+          ...CONFIG.creation.drawingRules,
+          occupiedAreaReference: CONFIG.creation.balance.occupiedAreaReference,
+          areaEffectBonusMax: CONFIG.creation.balance.areaEffectBonusMax,
+          areaEnergyCostMax: CONFIG.creation.balance.areaEnergyCostMax
+        };
       }
 
       function analyzeCurrentDrawing() {
@@ -362,11 +649,11 @@
           game.strokes,
           CONFIG.base[game.selectedType],
           sharedAnalysisConfig(),
-          { dashed: game.dashedDrawing }
+          { mode: game.creationMode, coreLineCount: game.coreLineGroups.length }
         );
       }
 
-      function makeAnalysis() {
+      function makeAnalysis(random = Math.random) {
         const allowed = game.screen === "create" || (game.screen === "loadout" && game.analysisOverlayOpen);
         if (!allowed) return;
         const points = game.strokes.flat();
@@ -374,6 +661,9 @@
           game.analysis = null;
           game.message = "Add at least two drawing points before analysis.";
           return;
+        }
+        if (game.creationMode === "chaos" && !game.selectedType) {
+          game.selectedType = CONFIG.types[Math.floor(random() * CONFIG.types.length)];
         }
         const shared = analyzeCurrentDrawing();
         if (!shared) return;
@@ -401,12 +691,13 @@
           value: shared.value,
           cost: shared.cost,
           effectiveness: shared.effectiveness,
+          effectMultiplier: shared.effectMultiplier,
           metrics: shared.metrics,
           callWords,
           callName,
           cooldown: 1.5,
           sigil: game.strokes.map((stroke) => stroke.map((p) => ({ x: p.x, y: p.y }))),
-          dashed: game.dashedDrawing,
+          coreLineGroups: game.coreLineGroups.map((group) => [...group]),
           why: `${grade} ${trait.toLowerCase()} sigil: ${Math.round(shared.effectiveness * 100)}% effective, ${shared.metrics.strokeCount} stroke(s).`
         };
         game.message = "Contract analysis ready. Save it or reroll the Call Name.";
@@ -472,6 +763,7 @@
         game.message = "Match ended. Adjust your loadout or create another contract.";
       }
 
+      // COMBAT
       function startCombat() {
         autoFillLoadout();
         if (equippedContracts().every((contract) => !contract)) {
@@ -553,9 +845,10 @@
       function addSigilFlash(contract, actor) {
         const x = actor === "player" ? 320 : 930;
         const y = 350;
-        game.particles.push({ kind: "sigil", x, y, life: 0.55, color: CONFIG.typeColors[contract.type], sigil: contract.sigil, dashed: contract.dashed });
+        game.particles.push({ kind: "sigil", x, y, life: 0.55, color: CONFIG.typeColors[contract.type], sigil: contract.sigil, coreLineGroups: contract.coreLineGroups || [] });
       }
 
+      // UPDATE
       function update(dt) {
         for (const particle of game.particles) particle.life -= dt;
         game.particles = game.particles.filter((particle) => particle.life > 0);
@@ -594,6 +887,7 @@
         if (c.result) game.message = `Result: ${c.result}. End the game to return to Loadout.`;
       }
 
+      // RENDER
       function draw() {
         game.buttons = [];
         drawBackground();
@@ -666,9 +960,9 @@
           });
         } else {
           const status = game.creationMode === "chaos"
-            ? `2. Random Contract Type: ${game.selectedType}`
+            ? `2. Random Contract Type: ${game.selectedType || "Assigned on Analyze"}`
             : `2. First Point Type: ${game.orderState.firstPointIndex === null ? "Choose a point" : game.selectedType}`;
-          drawText(status, creation.typeButtons.x, creation.labels.typeTitleY, 18, CONFIG.typeColors[game.selectedType], "left", "700");
+          drawText(status, creation.typeButtons.x, creation.labels.typeTitleY, 18, selectedTypeColor(), "left", "700");
           drawText(creation.modes[game.creationMode].label, creation.typeButtons.x, creation.labels.statusY, 15, "#b8c0b0");
         }
 
@@ -680,10 +974,12 @@
           resetCreationDrawing();
           game.message = "Drawing cleared.";
         });
-        button(game.dashedDrawing ? "Dashed On" : "Dashed Off", creation.actions.dashX, creation.actions.y, creation.actions.width, creation.actions.height, () => {
-          game.dashedDrawing = !game.dashedDrawing;
+        button(game.coreLineMode ? "Core Line On" : "Core Line Off", creation.actions.coreX, creation.actions.y, creation.actions.width, creation.actions.height, () => {
+          game.coreLineMode = !game.coreLineMode;
           game.analysis = null;
-          game.message = game.dashedDrawing ? "Dashed drawing enabled." : "Solid drawing enabled.";
+          game.message = game.coreLineMode
+            ? "Core Line enabled: new paths gain x1.05 effect and x1.1 energy cost."
+            : "Core Line disabled for new paths.";
         });
         if (game.creationMode === "order") button("Break Path", creation.actions.breakX, creation.actions.y, creation.actions.width, creation.actions.height, breakOrderStroke);
         drawAnalysisPanel();
@@ -696,7 +992,7 @@
         ctx.beginPath();
         ctx.arc(circle.center.x, circle.center.y, circle.radius, 0, TAU);
         ctx.fill();
-        ctx.strokeStyle = CONFIG.typeColors[game.selectedType];
+        ctx.strokeStyle = selectedTypeColor();
         ctx.lineWidth = circle.borderWidth;
         ctx.stroke();
 
@@ -706,17 +1002,15 @@
           drawText(instruction, circle.center.x, circle.center.y, 16, "#68707a", "center");
         }
         const strokeWidth = game.creationMode === "order" ? creation.order.edgeWidth : null;
-        drawStoredSigil(game.strokes, 0, 0, 1, CONFIG.typeColors[game.selectedType], 1, game.dashedDrawing, strokeWidth);
+        drawStoredSigil(game.strokes, 0, 0, 1, selectedTypeColor(), 1, strokeWidth, game.coreLineGroups);
         if (game.creationMode === "order") drawOrderPoints();
       }
 
       function drawSymmetryAxes() {
         const balance = balancePointConfig();
-        const dash = CONFIG.creation.drawingRules.guideDashPattern;
         ctx.save();
         ctx.strokeStyle = "#68707a";
         ctx.lineWidth = balance.axisLineWidth;
-        ctx.setLineDash(dash);
         for (let axis = 0; axis < balance.axes; axis += 1) {
           const angle = balance.axisOffset + axis * Math.PI / balance.axes;
           const dx = Math.cos(angle) * balance.axisLineLength;
@@ -761,11 +1055,16 @@
           game.callRoll += 1;
           makeAnalysis();
         });
-        drawText(`Effect: ${effectText(a)}`, r.x + 28, y + 88, 19, "#f3f4ea");
-        drawText(`Mana Cost: ${a.cost}`, r.x + 28, y + 118, 19, "#f3f4ea");
-        drawText(`Effectiveness: ${Math.round(a.effectiveness * 100)}% | Grade: ${a.grade}`, r.x + 28, y + 148, 18, "#f3f4ea");
-        drawText(`Length ${Math.round(a.metrics.totalDrawingLength)} | Strokes ${a.metrics.strokeCount} | Breaks ${a.metrics.strokeBreaks}`, r.x + 28, y + 180, 15, "#b8c0b0");
-        drawText(`Outline ${Math.round(a.metrics.outerOutlineCompletion * 100)}% | Shapes ${a.metrics.innerCompletedShapes} | Crossings ${a.metrics.crossings} | Overlaps ${a.metrics.overlaps}`, r.x + 28, y + 206, 15, "#b8c0b0");
+        drawText(`Type: ${a.type} | Mode: ${CONFIG.creation.modes[a.mode].shortLabel}`, r.x + 28, y + 82, 18, CONFIG.typeColors[a.type], "left", "700");
+        drawText(`Effect: ${effectText(a)}`, r.x + 28, y + 112, 18, "#f3f4ea");
+        drawText(`Energy Cost: ${a.cost}/${CONFIG.creation.analysis.maxEnergyCost}`, r.x + 28, y + 142, 18, "#f3f4ea");
+        drawText(`Effect Multiplier: x${a.effectMultiplier.toFixed(2)} | Core Lines: ${a.metrics.coreLineCount}`, r.x + 28, y + 172, 17, "#f3f4ea");
+        if (a.mode === "balance") {
+          drawText(`Occupied Area: ${Math.round(a.metrics.occupiedArea)} (${Math.round(a.metrics.occupiedAreaRatio * 100)}%)`, r.x + 28, y + 200, 16, "#b8c0b0");
+        } else {
+          drawText(`Length: ${Math.round(a.metrics.totalDrawingLength)} | Breaks: ${a.metrics.strokeBreaks}`, r.x + 28, y + 200, 16, "#b8c0b0");
+        }
+        drawText(`Effectiveness: ${Math.round(a.effectiveness * 100)}% | Grade: ${a.grade} | Shapes: ${a.metrics.innerCompletedShapes}`, r.x + 28, y + 226, 15, "#b8c0b0");
         button("Save & Combat", r.x + 28, r.y + r.h - 66, 170, 44, saveContract, "#5fb3a1");
         button("Cancel", r.x + 216, r.y + r.h - 66, 154, 44, () => { game.screen = "loadout"; });
       }
@@ -910,8 +1209,8 @@
       function guideLines() {
         if (game.screen === "create") return [
           "Chaos draws freely, Order connects typed points, and Balance mirrors your strokes.",
-          "Continuous outlines cost less mana; breaks, crossings, and overlaps carry penalties.",
-          "Analyze uses one shared metric system, then Save enters combat."
+          "Broken paths are allowed. Mark major new paths as Core Lines for effect and energy scaling.",
+          "Balance rewards occupied area; all modes share one analysis system capped at 60 Energy."
         ];
         if (game.screen === "loadout") return [
           "Equip saved contracts into the four battle slots.",
@@ -932,21 +1231,25 @@
           ctx.globalAlpha = clamp(particle.life * 2, 0, 1);
           ctx.translate(particle.x, particle.y);
           const scale = 0.34 + (0.55 - particle.life) * 0.4;
-          drawStoredSigil(particle.sigil, -CONFIG.drawRect.x * scale, -CONFIG.drawRect.y * scale, scale, particle.color, 1, particle.dashed);
+          drawStoredSigil(particle.sigil, -CONFIG.drawRect.x * scale, -CONFIG.drawRect.y * scale, scale, particle.color, 1, null, particle.coreLineGroups);
           ctx.restore();
         }
       }
 
-      function drawStoredSigil(strokes, ox, oy, scale, color, alpha, dashed = false, configuredLineWidth = null) {
+      function drawStoredSigil(strokes, ox, oy, scale, color, alpha, configuredLineWidth = null, coreLineGroups = []) {
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.strokeStyle = color;
-        ctx.setLineDash(dashed ? CONFIG.creation.drawingRules.dashPattern : []);
-        ctx.lineWidth = configuredLineWidth ?? Math.max(2, 4 * scale);
+        const baseLineWidth = configuredLineWidth ?? Math.max(2, 4 * scale);
+        const coreStrokeIndexes = new Set(coreLineGroups.flat());
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        for (const stroke of strokes) {
+        for (let strokeIndex = 0; strokeIndex < strokes.length; strokeIndex += 1) {
+          const stroke = strokes[strokeIndex];
           if (stroke.length < 2) continue;
+          ctx.lineWidth = coreStrokeIndexes.has(strokeIndex)
+            ? baseLineWidth * CONFIG.creation.drawingRules.coreLineWidthMultiplier
+            : baseLineWidth;
           ctx.beginPath();
           ctx.moveTo(ox + stroke[0].x * scale, oy + stroke[0].y * scale);
           for (let i = 1; i < stroke.length; i += 1) ctx.lineTo(ox + stroke[i].x * scale, oy + stroke[i].y * scale);
@@ -1020,6 +1323,7 @@
         if (stroke) ctx.stroke();
       }
 
+      // INPUT
       canvas.addEventListener("pointerdown", (event) => {
         const p = pointFromEvent(event);
         for (let i = game.buttons.length - 1; i >= 0; i -= 1) {
@@ -1081,6 +1385,7 @@
         startCombat
       };
 
+      // MAIN LOOP
       let last = performance.now();
       function loop(now) {
         const dt = Math.min(0.033, (now - last) / 1000);

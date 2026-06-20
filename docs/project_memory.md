@@ -31,5 +31,10 @@
 - New sessions start with three weak starter contracts defined in `CONFIG.starterContracts` and copied into game state.
 - Deleting a contract clears its loadout slots and safely advances or clears `selectedContractId`.
 - Contract Creation has three Canvas-only modes: Chaos free-draw with random type, Order typed-point connections, and Balance mirrored drawing.
-- Shared drawing metrics and stat formulas live in `src/contract-creation.js`; all modes use the same analyzer.
+- `index.html` is the single playable source of truth and contains all runtime HTML, CSS, config, state, input, creation analysis, combat, rendering, and game flow.
+- Shared drawing metrics and stat formulas are inlined in the `CONTRACT CREATION` section of `index.html`; all modes use the same analyzer.
 - Creation tuning, geometry, penalties, symmetry axes, and 80%-120% effectiveness limits live under `CONFIG.creation`.
+- Chaos Contract Type remains unassigned until a valid analysis runs.
+- Contract analysis caps energy at `CONFIG.creation.analysis.maxEnergyCost` (60) and applies `globalEffectBoost` (1.2) after the separate 80%-120% effectiveness multiplier.
+- Balance Contract Creation uses occupied area, not line length, as its primary effect and drawing-energy driver.
+- Each user-marked Core Line multiplies effect by 1.05 and uncapped energy by 1.1; broken paths remain allowed.
