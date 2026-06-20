@@ -62,9 +62,10 @@ Add simple Ink Bag player progression and ink-tier contract scaling.
 - Added eight progression/config tests; all 48 project tests, single-file compilation, UI label checks, and local HTTP checks pass.
 - Interactive browser verification was unavailable; Canvas render and transition tests passed.
 - Committed the verified Ink Bag progression, starter patterns, Random Order points, tests, and documentation on `main`.
+- Pushed all four feature commits through `c5c446e` to `origin/main`.
 
 ## Next Action
-Push `main` to GitHub, then verify Ink Bag progression and starter previews on GitHub Pages.
+Verify the GitHub Pages deployment and live Ink Bag/starter-preview flow after Actions completes.
 
 ## Blockers
 - None.
