@@ -62,11 +62,71 @@ function orderState() {
   return { strokes: [], edges: new Set(), currentStrokeIndex: null, lastPointIndex: null };
 }
 
+function replayStarterPattern(app, starter) {
+  app.game.screen = "create";
+  app.selectCreationMode("order", () => 0);
+  for (const pointId of starter.drawing.pointPath) app.selectOrderPoint(pointId);
+  app.makeAnalysis(() => 0);
+  return app.game.analysis;
+}
+
 test("mode selection works", () => {
   const app = loadGame();
   assert.equal(app.selectCreationMode("order", () => 0), true);
   assert.equal(app.game.creationMode, "order");
   assert.equal(app.game.strokes.length, 0);
+});
+
+test("each default contract has saved drawing and Order path data", () => {
+  const app = loadGame();
+  const starters = app.game.library.filter((contract) => contract.isStarter);
+  assert.equal(starters.length, 3);
+  for (const starter of starters) {
+    assert.ok(starter.name);
+    assert.equal(starter.drawing.mode, "order");
+    assert.equal(starter.drawing.source, "starter-order-pattern");
+    assert.ok(starter.drawing.pointPath.length >= 2);
+    assert.ok(starter.previewDrawing.flat().length >= 2);
+    assert.ok(starter.sigil.flat().length >= 2);
+  }
+});
+
+test("each default drawing uses valid Order point IDs", () => {
+  const app = loadGame();
+  const pointCount = app.CONFIG.creation.order.pointCount;
+  for (const starter of app.game.library.filter((contract) => contract.isStarter)) {
+    assert.ok(starter.drawing.pointPath.every((pointId) => Number.isInteger(pointId) && pointId >= 0 && pointId < pointCount));
+  }
+});
+
+test("default paths can be replayed and analyzed through Order Creation", () => {
+  const source = loadGame();
+  for (const starter of source.game.library.filter((contract) => contract.isStarter)) {
+    const app = loadGame();
+    const analysis = replayStarterPattern(app, starter);
+    assert.ok(analysis);
+    assert.equal(analysis.mode, "order");
+    assert.ok(analysis.metrics.totalDrawingLength > 0);
+  }
+});
+
+test("replaying a default path reproduces its pattern and type", () => {
+  const source = loadGame();
+  for (const starter of source.game.library.filter((contract) => contract.isStarter)) {
+    const app = loadGame();
+    const analysis = replayStarterPattern(app, starter);
+    assert.equal(analysis.patternId, starter.drawing.patternId);
+    assert.equal(analysis.type, starter.type);
+    assert.equal(analysis.name, starter.name);
+  }
+});
+
+test("Loadout preview can access every default drawing", () => {
+  const app = loadGame();
+  for (const starter of app.game.library.filter((contract) => contract.isStarter)) {
+    assert.equal(app.getContractPreviewStrokes(starter), starter.previewDrawing);
+  }
+  assert.doesNotThrow(() => app.draw());
 });
 
 test("Chaos assigns a random contract type only when analysis runs", () => {
@@ -117,6 +177,53 @@ test("Order first point sets type and starts the drawing path", () => {
   assert.equal(app.game.strokes[0][0].orderIndex, firstPoint.index);
   assert.equal(app.game.strokes[0][0].x, firstPoint.x);
   assert.equal(app.game.strokes[0][0].y, firstPoint.y);
+});
+
+test("extra Order points display as Random", () => {
+  const app = loadGame();
+  app.selectCreationMode("order");
+  const extraPoints = app.game.orderPoints.slice(app.CONFIG.types.length);
+  assert.ok(extraPoints.length > 0);
+  assert.ok(extraPoints.every((point) => point.isRandom && point.type === null && point.label === "Random"));
+});
+
+test("Random first point does not assign type before analysis", () => {
+  const app = loadGame();
+  app.selectCreationMode("order");
+  app.selectOrderPoint(app.CONFIG.types.length);
+  assert.equal(app.game.selectedType, null);
+  assert.equal(app.game.orderRandomTypePending, true);
+});
+
+test("Random point type is assigned during analysis", () => {
+  const app = loadGame();
+  app.game.screen = "create";
+  app.selectCreationMode("order");
+  app.selectOrderPoint(app.CONFIG.types.length);
+  app.selectOrderPoint(0);
+  app.makeAnalysis(() => 0.999);
+  assert.equal(app.game.selectedType, app.CONFIG.types.at(-1));
+  assert.equal(app.game.orderRandomTypePending, false);
+});
+
+test("non-random first point still sets type immediately", () => {
+  const app = loadGame();
+  app.selectCreationMode("order");
+  app.selectOrderPoint(2);
+  assert.equal(app.game.selectedType, "Heal");
+  assert.equal(app.game.orderRandomTypePending, false);
+});
+
+test("Random first point becomes the contract type only after analysis", () => {
+  const app = loadGame();
+  app.game.screen = "create";
+  app.selectCreationMode("order");
+  app.selectOrderPoint(app.CONFIG.types.length);
+  app.selectOrderPoint(0);
+  assert.equal(app.game.selectedType, null);
+  app.makeAnalysis(() => 0);
+  assert.equal(app.game.analysis.type, "Damage");
+  assert.equal(app.game.selectedType, app.game.analysis.type);
 });
 
 test("Balance produces mirrored drawing data", () => {
@@ -188,6 +295,57 @@ test("global effect boost adds 20 percent after effectiveness", () => {
   assert.equal(config.globalEffectBoost, 1.2);
   assert.ok(result.effectiveness >= config.effectivenessMin && result.effectiveness <= config.effectivenessMax);
   assert.equal(result.value, expected);
+});
+
+test("ink capacity limits contract analysis", () => {
+  const app = loadGame();
+  app.game.screen = "create";
+  app.selectCreationMode("balance");
+  app.game.selectedType = "Damage";
+  app.game.ink.amount = 1;
+  app.game.strokes = [[{ x: 220, y: 360 }, { x: 430, y: 530 }]];
+  app.makeAnalysis();
+  assert.equal(app.game.analysis, null);
+  assert.match(app.game.message, /Not enough ink/);
+});
+
+test("ink inventory and drawing cost use config values", () => {
+  const app = loadGame();
+  assert.equal(app.game.ink.amount, app.CONFIG.ink.startingAmount);
+  assert.equal(app.game.ink.capacity, app.CONFIG.ink.capacity);
+  app.CONFIG.ink.costPerLength = 0.5;
+  app.CONFIG.ink.costPerStroke = 4;
+  app.CONFIG.ink.costPerCoreLine = 3;
+  const cost = app.calculateInkCost({ totalDrawingLength: 10, strokeCount: 2, coreLineCount: 1 });
+  assert.equal(cost, 16);
+});
+
+test("better ink tiers add two percent per tier", () => {
+  const app = loadGame();
+  const multipliers = Array.from(app.CONFIG.ink.types, (ink) => ink.multiplier);
+  assert.deepEqual(multipliers, [1, 1.02, 1.04, 1.06]);
+  for (let index = 1; index < multipliers.length; index += 1) {
+    assert.ok(Math.abs(multipliers[index] - multipliers[index - 1] - 0.02) < 0.000001);
+  }
+});
+
+test("contract analysis includes and applies selected ink multiplier", () => {
+  const analyzeWithInk = (inkTypeId) => {
+    const app = loadGame();
+    app.game.screen = "create";
+    app.selectCreationMode("balance");
+    app.game.selectedType = "Damage";
+    app.game.ink.amount = app.game.ink.capacity;
+    app.game.ink.selectedTypeId = inkTypeId;
+    app.game.strokes = [[{ x: 280, y: 410 }, { x: 370, y: 490 }]];
+    app.makeAnalysis();
+    return app.game.analysis;
+  };
+  const basic = analyzeWithInk("basic");
+  const fine = analyzeWithInk("fine");
+  assert.equal(fine.inkType, "fine");
+  assert.equal(fine.inkMultiplier, 1.02);
+  assert.ok(Math.abs(fine.effectMultiplier / basic.effectMultiplier - 1.02) < 0.000001);
 });
 
 test("each Core Line multiplies effect by x1.05", () => {

@@ -7,7 +7,7 @@ Read only `docs/agent_state.md`, `docs/agent_brief.md`, and the last 30 lines of
 Maintain the Dragon Contractor game and its GitHub Pages deployment.
 
 ## Current Task
-Update Balance, Order, and Core Line Contract Creation rules.
+Add simple Ink Bag player progression and ink-tier contract scaling.
 
 ## Completed Steps
 - GitHub Pages deployment and root documentation consolidation were completed and pushed previously.
@@ -46,9 +46,25 @@ Update Balance, Order, and Core Line Contract Creation rules.
 - Verified the single-file build, Create Contract UI labels, local HTTP 200, and no external runtime script dependency.
 - Interactive browser verification was unavailable; all three modes passed Canvas render tests.
 - Committed the verified single-file Contract Creation rule update on `main`.
+- Added names, weak stats, Order drawing source, pattern IDs, and fixed point paths to all three starter configs.
+- Derived starter sigils and preview drawings from the same fixed Order point geometry used by players.
+- Added Order path matching so replaying a starter path reproduces its pattern identity and Contract Type through shared analysis.
+- Added compact Loadout sigil previews backed by saved drawing data.
+- Added five starter drawing/replay/preview tests; all 35 project tests pass and the local single-file game returns HTTP 200.
+- Changed extra Order points to store and display `Random` instead of a preselected hidden type.
+- Kept `selectedType` null when a Random point starts the path and resolved it only during valid analysis.
+- Preserved immediate type assignment for fixed typed points and existing starter-pattern replay behavior.
+- Added five Random Order point tests; all 40 project tests and the single-file compile check pass.
+- Added config-driven Ink Bag capacity, starting amount, win reward, consumption formula, and four +2% ink tiers.
+- Added win-only reward handling on End Game; lose/draw grant nothing and ink persists on return to Loadout.
+- Added ink-limited contract analysis, save-time ink spending, tier selection, and post-analysis ink effect scaling.
+- Added Canvas Ink Bag status to Loadout and Contract Creation, including selected tier, multiplier, ink use, and last reward.
+- Added eight progression/config tests; all 48 project tests, single-file compilation, UI label checks, and local HTTP checks pass.
+- Interactive browser verification was unavailable; Canvas render and transition tests passed.
+- Committed the verified Ink Bag progression, starter patterns, Random Order points, tests, and documentation on `main`.
 
 ## Next Action
-Push `main` to GitHub, then verify the updated Create Contract UI on GitHub Pages.
+Push `main` to GitHub, then verify Ink Bag progression and starter previews on GitHub Pages.
 
 ## Blockers
 - None.

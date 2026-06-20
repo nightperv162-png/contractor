@@ -63,3 +63,13 @@
 - Confirmed Order's first point sets type and starts the path, with reversed duplicate edges still blocked.
 - Added new rule/UI tests; all 30 tests, single-file compilation, UI label checks, HTTP 200, and `git diff --check` passed.
 - Committed the verified Balance, Order, Core Line, single-file consolidation, tests, and documentation on `main`.
+- Added reproducible fixed-point Order paths and path-derived preview/sigil data for all three starter contracts.
+- Added starter pattern matching in shared Order analysis and compact Loadout previews.
+- Added five requested tests; all 35 tests, inline compilation, `git diff --check`, and local HTTP 200 passed.
+- Updated extra Order points to display `Random` and defer first-point type resolution until analysis.
+- Added five delayed Random-type tests; all 40 tests and inline compilation passed.
+- Added config-driven Ink Bag inventory, four ink tiers, win-only rewards, drawing consumption, and post-analysis ink multipliers.
+- Added Canvas Ink status and tier controls to Loadout and Contract Creation.
+- Added eight progression/config tests; all 48 tests, single-file compilation, UI/reward labels, HTTP 200, and `git diff --check` passed.
+- Interactive browser verification was unavailable; Canvas render and state-transition tests covered the requested flow.
+- Committed the verified Ink Bag progression and accumulated starter/Order updates on `main`.

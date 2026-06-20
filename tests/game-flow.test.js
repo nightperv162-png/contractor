@@ -92,3 +92,46 @@ test("End Game returns to Loadout", () => {
   assert.equal(app.game.screen, "loadout");
   assert.equal(app.game.combat, null);
 });
+
+test("win grants configured ink reward", () => {
+  const app = loadGame();
+  app.game.ink.amount = 20;
+  app.startCombat();
+  app.game.combat.result = "Win";
+  app.endGame();
+  assert.equal(app.game.ink.amount, 20 + app.CONFIG.ink.rewardAmount);
+  assert.equal(app.game.lastInkReward, app.CONFIG.ink.rewardAmount);
+});
+
+test("lose and draw grant no ink", () => {
+  for (const result of ["Lose", "Draw"]) {
+    const app = loadGame();
+    app.game.ink.amount = 20;
+    app.startCombat();
+    app.game.combat.result = result;
+    app.endGame();
+    assert.equal(app.game.ink.amount, 20);
+    assert.equal(app.game.lastInkReward, 0);
+  }
+});
+
+test("ink persists through return to Loadout", () => {
+  const app = loadGame();
+  app.game.ink.amount = 10;
+  app.startCombat();
+  app.game.combat.result = "Win";
+  app.endGame();
+  assert.equal(app.game.screen, "loadout");
+  assert.equal(app.game.ink.amount, 10 + app.CONFIG.ink.rewardAmount);
+});
+
+test("ink reward uses config value", () => {
+  const app = loadGame();
+  app.CONFIG.ink.rewardAmount = 7;
+  app.game.ink.amount = 0;
+  app.startCombat();
+  app.game.combat.result = "Win";
+  app.endGame();
+  assert.equal(app.game.ink.amount, 7);
+  assert.equal(app.game.lastInkReward, 7);
+});

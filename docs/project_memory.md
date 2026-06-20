@@ -38,3 +38,9 @@
 - Contract analysis caps energy at `CONFIG.creation.analysis.maxEnergyCost` (60) and applies `globalEffectBoost` (1.2) after the separate 80%-120% effectiveness multiplier.
 - Balance Contract Creation uses occupied area, not line length, as its primary effect and drawing-energy driver.
 - Each user-marked Core Line multiplies effect by 1.05 and uncapped energy by 1.1; broken paths remain allowed.
+- Each starter contract stores a reproducible Order Creation point path in config; state derives its sigil and Loadout preview from the fixed Order point geometry.
+- Replaying a starter's exact Order path reproduces its saved pattern identity and Contract Type while still using shared analysis.
+- Extra Order points are marked `Random` with no hidden Contract Type; when selected first, their type resolves only during valid analysis.
+- Player progression uses a config-driven Ink Bag with current amount, capacity, win reward, and Basic/Fine/Rare/Arcane tiers at x1.00/x1.02/x1.04/x1.06.
+- Ink is rewarded only when ending a won match, persists in Loadout, limits contract finalization, and is spent when a contract is saved.
+- The selected ink multiplier stacks after normal contract analysis.
