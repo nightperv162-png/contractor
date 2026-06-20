@@ -31,3 +31,18 @@
 - Committed staged documentation consolidation as `6081a71 docs: consolidate project documentation`.
 - Pushed `main` to `https://github.com/nightperv162-png/contractor.git`.
 - Updated `docs/agent_state.md` after push so the next action points to checking the GitHub Pages deployment result.
+
+## 2026-06-20
+- Read the canonical root memory files before making changes.
+- Inspected the top navigation and related Create, Loadout, and Combat screen transitions in `index.html`.
+- Reordered the top navigation to `Loadout`, `Create`, `Combat`; gameplay and screen actions remain unchanged.
+- Ran `git diff --check`; it passed.
+- Compiled the inline `index.html` script with Node; one script compiled successfully.
+- Attempted rendered browser verification, but the in-app browser connection was unavailable in this session.
+- Created `docs/agent_brief.md`, compacted `agent_state.md`, and set future startup context to state + brief + the last 30 work-log lines; `agent_rules_short.md` was not present to merge or remove.
+- Updated the game flow to start at Loadout, save new contracts into Combat, and return from End Game to Loadout.
+- Added three weak config-driven starter contracts plus safe equip, selection, and delete behavior.
+- Added `tests/game-flow.test.js`; all 6 requested tests pass.
+- Verified inline JavaScript compilation, `git diff --check`, and local HTTP 200 at `http://127.0.0.1:8000/`.
+- In-app rendered verification was unavailable in this session.
+- Committed the verified game-flow, tests, and compact agent documentation on `main`.

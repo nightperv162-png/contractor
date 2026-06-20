@@ -27,3 +27,6 @@
 - Do not force-update GitHub `main` without explicit user approval when branch trees differ.
 - Generated build output such as `dist` should not be staged unless deployment explicitly requires it.
 - Project design documents from nested `Dragon Contractor/docs/` were consolidated into root `docs/`.
+- The game flow is `Loadout` -> `Create Contract` -> `Combat` -> `End Game` -> `Loadout`.
+- New sessions start with three weak starter contracts defined in `CONFIG.starterContracts` and copied into game state.
+- Deleting a contract clears its loadout slots and safely advances or clears `selectedContractId`.

@@ -1,26 +1,29 @@
 # Agent State
 
+## Next-Prompt Context
+Read only `docs/agent_state.md`, `docs/agent_brief.md`, and the last 30 lines of `docs/work_log.md` before starting. Read other project documents only when the task specifically requires them.
+
 ## Current Goal
-Prepare and verify the HTML game project for GitHub Pages deployment while keeping canonical Markdown documentation at root `docs/`.
+Maintain the Dragon Contractor game and its GitHub Pages deployment.
 
 ## Current Task
-Commit and push the documentation consolidation and deployment verification work to GitHub.
+Update the game loop to start and end at Loadout, with starter contracts and safe library deletion.
 
 ## Completed Steps
-- Read root `docs/project_memory.md`, `docs/agent_state.md`, and `docs/work_log.md` before working.
-- Verified repository root contains `.github`, `docs`, `.nojekyll`, `index.html`, and `README.md`.
-- Verified `.github/workflows/pages.yml` deploys the repository root to GitHub Pages on pushes to `main` and manual workflow runs.
-- Verified `README.md` documents local run instructions, GitHub Pages deployment, and live demo URL placeholder.
-- Confirmed `index.html` is at the project root and is the deployable game entrypoint.
-- Searched for runtime asset references in `index.html`; the game uses inline CSS/JS and no external image, CSS, JS, audio, or fetch paths.
-- Checked for duplicate generated folders such as `dist`, `build`, and `node_modules`; none were found.
-- Confirmed the old nested `Dragon Contractor` folder no longer exists.
-- Ran a Node syntax check against the inline script in root `index.html`; it compiled successfully.
-- Committed documentation consolidation as `6081a71 docs: consolidate project documentation`.
-- Pushed `main` to `https://github.com/nightperv162-png/contractor.git`.
+- GitHub Pages deployment and root documentation consolidation were completed and pushed previously.
+- The uncommitted top-navigation order is `Loadout`, `Create`, `Combat`; source and syntax checks passed.
+- Created `docs/agent_brief.md` with the reusable startup, workflow, and completion rules.
+- Confirmed `docs/agent_rules_short.md` does not exist in the working tree or Git history, so no source file required removal.
+- Kept state, work log, project memory, and all full design documents separate.
+- Changed the flow to `Loadout` -> `Create Contract` -> `Combat` -> `End Game` -> `Loadout`.
+- Added three weak starter contracts in config/state and initialized them in the library and loadout.
+- Added contract deletion with safe selected-contract and equipped-slot cleanup.
+- Added six Node tests covering startup, defaults, deletion, creation-to-combat, and end-game return.
+- Verified 6/6 tests pass, the inline script compiles, `git diff --check` passes, and the local server returns HTTP 200.
+- Committed the verified game-flow and documentation changes on `main`.
 
 ## Next Action
-Check the GitHub Pages Actions run and live Pages URL after GitHub finishes deploying.
+Push `main` to GitHub, then verify the new flow on GitHub Pages.
 
 ## Blockers
 - None.

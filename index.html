@@ -66,6 +66,44 @@
           Curse: { effect: 30, cost: 20, text: "Enemy next contract -30%" },
           Vitality: { effect: 50, cost: 25, text: "Max HP" }
         },
+        starterContracts: [
+          {
+            id: "starter-ember",
+            dragon: "Ignivar",
+            trait: "Faint",
+            power: "Ember Tap",
+            type: "Damage",
+            grade: "Rough",
+            value: 8,
+            cost: 8,
+            callName: "Ember",
+            cooldown: 2
+          },
+          {
+            id: "starter-mend",
+            dragon: "Mirava",
+            trait: "Faint",
+            power: "Mending Spark",
+            type: "Heal",
+            grade: "Rough",
+            value: 12,
+            cost: 18,
+            callName: "Mend",
+            cooldown: 2.5
+          },
+          {
+            id: "starter-spark",
+            dragon: "Voltaris",
+            trait: "Faint",
+            power: "Quiet Spark",
+            type: "Energy",
+            grade: "Rough",
+            value: 15,
+            cost: 0,
+            callName: "Spark",
+            cooldown: 3
+          }
+        ],
         drawRect: { x: 70, y: 270, w: 512, h: 280 },
         analysisRect: { x: 636, y: 150, w: 570, h: 440 },
         guideRect: { x: 1126, y: 30, w: 92, h: 42 }
@@ -76,17 +114,29 @@
       const TAU = CONFIG.app.fullCircleRadians;
       const keys = new Set();
 
+      function createStarterContracts() {
+        return CONFIG.starterContracts.map((contract) => ({
+          ...contract,
+          callWords: [contract.dragon, contract.trait, ...contract.power.split(" ")],
+          cooldownLeft: 0,
+          sigil: [],
+          why: "Starter contract with intentionally weak fixed stats.",
+          isStarter: true
+        }));
+      }
+
       const game = {
-        screen: "create",
-        previousScreen: "create",
+        screen: "loadout",
+        previousScreen: "loadout",
         guideOpen: false,
-        message: "Choose a Contract Type, draw a sigil, then save the analysis.",
+        message: "Choose contracts for battle or create a new contract.",
         selectedType: "Damage",
         strokes: [],
         activeStroke: null,
         analysis: null,
-        library: [],
-        loadout: [null, null, null, null],
+        library: createStarterContracts(),
+        loadout: [...CONFIG.starterContracts.map((contract) => contract.id), null],
+        selectedContractId: CONFIG.starterContracts[0].id,
         callRoll: 0,
         combat: null,
         particles: [],
@@ -182,18 +232,24 @@
           makeAnalysis();
           return;
         }
-        game.library.push({ ...game.analysis, cooldownLeft: 0 });
-        autoFillLoadout();
+        const saved = { ...game.analysis, cooldownLeft: 0 };
+        game.library.push(saved);
+        game.selectedContractId = saved.id;
+        const empty = game.loadout.findIndex((id) => !id);
+        game.loadout[empty === -1 ? 0 : empty] = saved.id;
         game.strokes = [];
         game.activeStroke = null;
         game.analysis = null;
         game.callRoll = 0;
-        game.message = "Contract saved to the library.";
+        game.message = "Contract saved. Entering combat.";
+        startCombat();
       }
 
       function autoFillLoadout() {
         for (let i = 0; i < game.loadout.length; i += 1) {
-          if (!game.loadout[i] && game.library[i]) game.loadout[i] = game.library[i].id;
+          if (game.loadout[i]) continue;
+          const available = game.library.find((contract) => !game.loadout.includes(contract.id));
+          if (available) game.loadout[i] = available.id;
         }
       }
 
@@ -201,10 +257,41 @@
         return game.loadout.map((id) => game.library.find((contract) => contract.id === id) || null);
       }
 
+      function openCreateContract() {
+        game.screen = "create";
+        game.message = "Choose a Contract Type, draw a sigil, then save the analysis.";
+      }
+
+      function equipContract(id) {
+        if (!game.library.some((contract) => contract.id === id)) return false;
+        game.selectedContractId = id;
+        const empty = game.loadout.findIndex((contractId) => !contractId);
+        game.loadout[empty === -1 ? 0 : empty] = id;
+        const contract = game.library.find((item) => item.id === id);
+        game.message = `${fullName(contract)} equipped.`;
+        return true;
+      }
+
+      function deleteContract(id) {
+        const index = game.library.findIndex((contract) => contract.id === id);
+        if (index === -1) return false;
+        const [deleted] = game.library.splice(index, 1);
+        game.loadout = game.loadout.map((contractId) => contractId === id ? null : contractId);
+        if (game.selectedContractId === id) game.selectedContractId = game.library[0]?.id || null;
+        game.message = `${fullName(deleted)} deleted.`;
+        return true;
+      }
+
+      function endGame() {
+        game.screen = "loadout";
+        game.combat = null;
+        game.message = "Match ended. Adjust your loadout or create another contract.";
+      }
+
       function startCombat() {
         autoFillLoadout();
         if (equippedContracts().every((contract) => !contract)) {
-          game.screen = "create";
+          openCreateContract();
           game.message = "Create and save at least one contract before combat.";
           return;
         }
@@ -320,7 +407,7 @@
         else if (c.enemy.hp <= 0) c.result = "Win";
         else if (c.player.hp <= 0) c.result = "Lose";
         else if (c.timer <= 0) c.result = c.player.hp === c.enemy.hp ? "Draw" : c.player.hp > c.enemy.hp ? "Win" : "Lose";
-        if (c.result) game.message = `Result: ${c.result}. Press R to restart creation.`;
+        if (c.result) game.message = `Result: ${c.result}. End the game to return to Loadout.`;
       }
 
       function draw() {
@@ -358,9 +445,9 @@
         roundRect(32, 22, 1216, 72, 8, false, true);
         drawText("Dragon Contractor", 58, 42, 30, "#f3f4ea", "left", "700");
         drawText(`Phase: ${phaseName()}`, 58, 72, 14, "#b8c0b0");
-        button("Create", 660, 38, 112, 40, () => { game.screen = "create"; });
-        button("Loadout", 786, 38, 112, 40, () => { autoFillLoadout(); game.screen = "loadout"; });
-        button("Combat", 912, 38, 112, 40, startCombat);
+        button("Loadout", 660, 38, 112, 40, () => { autoFillLoadout(); game.screen = "loadout"; });
+        button("Create Contract", 786, 38, 146, 40, openCreateContract);
+        button("Combat", 946, 38, 112, 40, startCombat);
         button("Guide", CONFIG.guideRect.x, CONFIG.guideRect.y, CONFIG.guideRect.w, CONFIG.guideRect.h, () => {
           game.guideOpen = true;
           game.previousScreen = game.screen;
@@ -433,29 +520,25 @@
         drawText(`Cooldown: ${a.cooldown}s`, r.x + 28, y, 20, "#f3f4ea"); y += 34;
         drawText(`Grade: ${a.grade}`, r.x + 28, y, 20, "#f3f4ea"); y += 34;
         drawText(`Why: ${a.why}`, r.x + 28, y, 16, "#b8c0b0");
-        button("Save Contract", r.x + 28, r.y + r.h - 66, 170, 44, saveContract, "#5fb3a1");
-        button("Go Loadout", r.x + 216, r.y + r.h - 66, 154, 44, () => {
-          autoFillLoadout();
-          game.screen = "loadout";
-        });
+        button("Save & Combat", r.x + 28, r.y + r.h - 66, 170, 44, saveContract, "#5fb3a1");
+        button("Cancel", r.x + 216, r.y + r.h - 66, 154, 44, () => { game.screen = "loadout"; });
       }
 
       function drawLoadout() {
         drawText("Contract Library", 70, 132, 28, "#f3f4ea", "left", "700");
         if (!game.library.length) {
-          drawText("No contracts yet. Return to Contract Creation and save one.", 70, 190, 20, "#b8c0b0");
-          button("Create Contract", 70, 230, 184, 44, () => { game.screen = "create"; }, "#5fb3a1");
+          drawText("No contracts yet. Create one to continue to combat.", 70, 190, 20, "#b8c0b0");
+          button("Create Contract", 70, 230, 184, 44, openCreateContract, "#5fb3a1");
         }
         game.library.forEach((contract, index) => {
           const x = 70;
           const y = 180 + index * 76;
-          contractCard(contract, x, y, 490, 62);
-          button("Equip", 580, y + 10, 92, 38, () => {
-            const empty = game.loadout.findIndex((id) => !id);
-            game.loadout[empty === -1 ? 0 : empty] = contract.id;
-            game.message = `${contract.fullName || fullName(contract)} equipped.`;
-          });
+          contractCard(contract, x, y, 456, 62);
+          button(contract.id === game.selectedContractId ? "Selected" : "Equip", 540, y + 10, 82, 38, () => equipContract(contract.id));
+          button("Delete", 634, y + 10, 96, 38, () => deleteContract(contract.id), "#8c4355");
         });
+
+        if (game.library.length) button("Create Contract", 70, 582, 184, 44, openCreateContract, "#5fb3a1");
 
         drawText("Battle Slots", 760, 132, 28, "#f3f4ea", "left", "700");
         equippedContracts().forEach((contract, index) => {
@@ -560,8 +643,8 @@
         ctx.fillStyle = "rgba(5, 7, 10, 0.78)";
         ctx.fillRect(0, 0, W, H);
         drawText(result, W / 2, 292, 64, "#f3f4ea", "center", "700");
-        drawText("Press R to restart at Contract Creation.", W / 2, 344, 22, "#b8c0b0", "center");
-        button("Return to Loadout", W / 2 - 112, 386, 224, 52, () => { game.screen = "loadout"; game.combat = null; }, "#5fb3a1");
+        drawText("Press R or End Game to return to Loadout.", W / 2, 344, 22, "#b8c0b0", "center");
+        button("End Game", W / 2 - 112, 386, 224, 52, endGame, "#5fb3a1");
       }
 
       function drawGuide() {
@@ -720,14 +803,23 @@
         keys.add(key);
         if (["1", "2", "3", "4"].includes(key)) castSlot(Number(key) - 1);
         if (key === "r") {
-          game.screen = "create";
-          game.combat = null;
-          game.message = "Restarted at Contract Creation.";
+          endGame();
         }
         if (key === "g") game.guideOpen = !game.guideOpen;
       });
       window.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
       window.addEventListener("resize", fitCanvas);
+
+      window.DragonContractor = {
+        CONFIG,
+        game,
+        deleteContract,
+        endGame,
+        equipContract,
+        openCreateContract,
+        saveContract,
+        startCombat
+      };
 
       let last = performance.now();
       function loop(now) {
